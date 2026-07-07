@@ -256,6 +256,9 @@ namespace LethalCompanyRegionTag.Patches
 
                 Plugin.LogSource.LogInfo($"[TAIGU] Applied tag: '{tag}' to slot (confidence: {result.Confidence:F0}%)");
 
+                // Ensure CJK font fallback is applied to this label
+                EnsureCjkFallback(slot.LobbyName);
+
                 // Use rich text to color only the tag portion if supported
                 if (slot.LobbyName.richText)
                 {
@@ -463,6 +466,47 @@ namespace LethalCompanyRegionTag.Patches
             }
 
             return regionCode;
+        }
+
+        /// <summary>
+        /// Ensure CJK font fallback is applied to a TMP label.
+        /// This must be called each time because the game font may not have fallbacks at Awake time.
+        /// </summary>
+        private static void EnsureCjkFallback(TMPro.TextMeshProUGUI label)
+        {
+            if (!UI.FontManager.CjkFontAvailable || label == null || label.font == null) return;
+
+            try
+            {
+                TMPro.TMP_FontAsset labelFont = label.font;
+                var fallbacks = labelFont.fallbackFontAssetTable;
+                if (fallbacks == null)
+                {
+                    fallbacks = new System.Collections.Generic.List<TMPro.TMP_FontAsset>();
+                    labelFont.fallbackFontAssetTable = fallbacks;
+                }
+
+                // Check if CJK font is already in fallback list
+                bool hasFallback = false;
+                foreach (var fb in fallbacks)
+                {
+                    if (fb == UI.FontManager.CjkFontAsset)
+                    {
+                        hasFallback = true;
+                        break;
+                    }
+                }
+
+                if (!hasFallback)
+                {
+                    fallbacks.Add(UI.FontManager.CjkFontAsset);
+                    labelFont.fallbackFontAssetTable = fallbacks;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Plugin.LogSource.LogWarning($"[TAIGU] Error applying CJK font fallback: {ex.Message}");
+            }
         }
 
         private static UnityEngine.Color GetTagColor(float confidence)

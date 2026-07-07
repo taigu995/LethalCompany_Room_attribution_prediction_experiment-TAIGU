@@ -11,12 +11,20 @@
 
 ### 示例效果
 
+**中文显示模式**（需安装字体）：
 ```
-[CN 78% | JP 8% | KR 7% | VI 4%] 来几个人啊起嘛        ← 中国玩家创建
-[JP 92% | CN 4% | WEST 4%]     たのしいゲーム        ← 日本玩家创建
-[RU 85% | UA 8% | BY 4%]       Игровой сервер        ← 俄罗斯玩家创建
-[PL 65% | DE 15% | WEST 12%]   poland polska pl       ← 波兰玩家创建
-[WEST 35% | DE 20% | FR 15%]   Cool Lobby             ← 西欧玩家创建
+[中国 78% | 日本 8% | 韩国 7% | 越南 4%] 来几个人啊起嘛        ← 中国玩家创建
+[日本 92% | 中国 4% | 欧美 4%]            たのしいゲーム        ← 日本玩家创建
+[俄罗斯 85% | 乌克兰 8% | 白俄罗斯 4%]    Игровой сервер        ← 俄罗斯玩家创建
+[波兰 65% | 德国 15% | 欧美 12%]          poland polska pl       ← 波兰玩家创建
+[欧美 35% | 德国 20% | 法国 15%]          Cool Lobby             ← 西欧玩家创建
+```
+
+**英文缩写模式**（默认，无需字体）：
+```
+[CN 78% | JP 8% | KR 7% | VI 4%] 来几个人啊起嘛
+[JP 92% | CN 4% | WEST 4%]            たのしいゲーム
+[RU 85% | UA 8% | BY 4%]              Игровой сервер
 ```
 
 标签颜色会根据置信度变化：
@@ -158,6 +166,11 @@ ShowLowConfidenceTags = false
 
 ## 是否显示概率百分比
 ShowProbability = true
+
+## 是否使用中文显示地区名称（需要 CJK 字体支持）
+## true: 显示 [中国] [日本] [俄罗斯] 等
+## false: 显示 [CN] [JP] [RU] 等
+UseChineseDisplay = true
 ```
 
 ### 获取 Steam Web API Key（可选但推荐）
@@ -179,9 +192,10 @@ LethalCompanyRegionTag/
 │   ├── SteamWebQuery.cs           # Steam Web API / 社区 / XML 查询
 │   └── RegionResult.cs            # 分析结果数据模型
 ├── Patches/
-│   └── SteamLobbyManagerPatch.cs  # Harmony Patch (Hook 房间列表)
+│   └── LobbySlotPatch.cs          # Harmony Patch (Hook 房间列表)
 ├── UI/
-│   └── RegionTagManager.cs        # UI 标签管理 MonoBehaviour
+│   ├── FontManager.cs             # 字体管理器（扫描/加载 CJK 字体）
+│   └── RegionTagManager.cs        # UI 标签管理
 ├── Cache/
 │   └── RegionCache.cs             # 线程安全 TTL 缓存
 └── Config/
@@ -191,16 +205,18 @@ LethalCompanyRegionTag/
 ### 工作原理
 
 1. **Hook 房间列表**：通过 Harmony Patch 拦截 `SteamLobbyManager.loadLobbyListAndFilter`，获取公开房间列表
-2. **获取房主信息**：通过 `Lobby.Owner` 获取房主的 `Friend` 对象（包含昵称和 SteamID）
-3. **多源分析**：按优先级依次尝试 Steam Web API → 社区页面 → XML 资料 → 昵称分析
-4. **UI 标注**：在 `LobbySlot.LobbyName` 前添加 ASCII 格式的地区标签（如 `[CN 78%]`）
-5. **结果缓存**：分析结果缓存 10 分钟，避免重复查询
+2. **Phase 1 - 即时分析**：从 `LobbySlot.LobbyName` 读取服务器名称，使用 Unicode 字符集分析 + 关键词匹配，立即显示初步标签
+3. **Phase 2 - 异步查询**：后台从 `Lobby.Owner.Id` 提取房主 Steam ID，异步查询 Steam 社区页面获取真实国家代码
+4. **标签更新**：Steam 查询完成后自动更新标签，带 `*` 标记表示已验证
+5. **字体加载**：FontManager 自动扫描并加载 CJK 字体，支持中文标签显示
+6. **结果缓存**：分析结果缓存 10 分钟，避免重复查询
 
 ### 兼容性
 
 - **纯客户端**：不修改游戏逻辑，不影响联机
 - **无 API Key 也能工作**：昵称分析作为兜底方案始终可用
-- **字体兼容**：标签使用纯 ASCII 字符，兼容游戏默认字体
+- **字体兼容**：支持自动加载 CJK 字体，显示中文标签
+- **MoreCompany 兼容**：与多人房间扩展模组完全兼容
 
 ## 注意事项
 
@@ -208,6 +224,44 @@ LethalCompanyRegionTag/
 - 昵称分析基于统计规律，不是 100% 准确
 - Steam 用户隐私设置可能导致部分地区信息无法获取
 - 网络查询有 8 秒超时，不会阻塞游戏
+- 中文标签显示需要安装 CJK 字体（见安装步骤），否则自动降级为英文缩写
+
+## 版本历史
+
+### v1.5.0 - 字体管理器
+- 新增 FontManager 模块，自动扫描并加载 CJK 字体
+- 支持从插件目录加载 TTF/OTF 字体文件
+- 支持 5 层字体扫描策略（插件目录→已加载字体→游戏目录→BepInEx→根目录）
+- 标签自动使用加载的字体显示中文
+
+### v1.4.0 - Steam 自动查询
+- 两阶段识别策略：Phase 1 即时分析 + Phase 2 异步 Steam 查询
+- 自动从 Lobby 对象提取房主 Steam ID
+- Steam 社区页面查询结果自动更新标签
+
+### v1.3.0 - 中文 UI 显示
+- 新增中文地区名称显示（如 `[中国]` 代替 `[CN]`）
+- 新增 `UseChineseDisplay` 配置选项
+- 覆盖 60+ 个国家/地区的中文名称映射
+
+### v1.2.0 - 识别算法优化
+- 扩展关键词数据库（40+ 国家/地区）
+- 新增拉丁文字语言特征分析（土耳其语、波兰语、捷克语等）
+- 新增 Unicode 文字系统检测（老挝文、高棉文、缅甸文、蒙古文）
+- 优化置信度评分和概率分布算法
+
+### v1.1.0 - 初始版本
+- 多源混合分析（Steam API + 社区页面 + XML + 昵称分析）
+- 完整概率分布显示
+- BepInEx 配置支持
+
+## 文件清单
+
+| 文件 | 大小 | 说明 |
+|------|------|------|
+| `LethalCompanyRegionTag.dll` | 90KB | 主模组 DLL |
+| `chinese_font_ui.ttf` | 19MB | 微软雅黑字体（可选，用于显示中文） |
+| `TAIGU-RoomRecognition-README.md` | - | 本说明文件 |
 
 ## 许可
 

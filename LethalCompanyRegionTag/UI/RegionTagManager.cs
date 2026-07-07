@@ -242,14 +242,14 @@ namespace LethalCompanyRegionTag.UI
             if (region.Contains("Korea")) return "KR";
             if (region.Contains("Russia")) return "RU";
             if (region.Contains("Ukraine")) return "UA";
-            if (region.Contains("North America")) return "NA";
+            if (region.Contains("North America")) return "NAM";
             if (region.Contains("UK") || region.Contains("Ireland")) return "GB";
             if (region.Contains("Germany")) return "DE";
             if (region.Contains("France")) return "FR";
             if (region.Contains("Italy")) return "IT";
             if (region.Contains("Iberia") || region.Contains("Spain") || region.Contains("Portugal")) return "ES";
             if (region.Contains("Brazil")) return "BR";
-            if (region.Contains("Oceania") || region.Contains("Australia")) return "AU";
+            if (region.Contains("Oceania") || region.Contains("Australia")) return "OC";
             if (region.Contains("India")) return "IN";
             if (region.Contains("Thailand")) return "TH";
             if (region.Contains("Southeast Asia")) return "SEA";
@@ -259,7 +259,7 @@ namespace LethalCompanyRegionTag.UI
             if (region.Contains("Nordic")) return "NORD";
             if (region.Contains("Benelux")) return "BEN";
             if (region.Contains("Eastern Europe")) return "EE";
-            if (region.Contains("CIS")) return "CIS";
+            if (region.Contains("CIS")) return "EE";
             if (region.Contains("Greece")) return "GR";
             if (region.Contains("Israel")) return "IL";
             if (region.Contains("Poland")) return "PL";

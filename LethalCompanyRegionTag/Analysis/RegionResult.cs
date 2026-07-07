@@ -101,17 +101,17 @@ namespace LethalCompanyRegionTag.Analysis
                 case "Armenia": return "AM";
                 case "Georgia": return "GE";
                 case "Poland": return "PL";
-                case "Nordic": return "SE";
-                case "Middle East": return "SA";
-                case "North Africa": return "EG";
-                case "Latin America": return "MX";
-                case "North America": return "US";
-                case "Western Europe": return "EU";
+                case "Nordic": return "NORD";
+                case "Middle East": return "ME";
+                case "North Africa": return "NAF";
+                case "Latin America": return "LATAM";
+                case "North America": return "NAM";
+                case "Western Europe": return "WEST";
                 case "Southeast Asia": return "SEA";
                 case "Eastern Europe": return "EE";
-                case "Oceania": return "AU";
-                case "Other CIS": return "CIS";
-                case "Balkans": return "BA";
+                case "Oceania": return "OC";
+                case "Other CIS": return "EE";
+                case "Balkans": return "BALK";
                 case "Spain": return "ES";
                 case "Italy": return "IT";
                 case "Portugal": return "PT";
@@ -119,7 +119,7 @@ namespace LethalCompanyRegionTag.Analysis
                 case "Belgium": return "BE";
                 case "Cyprus": return "CY";
                 case "Nepal": return "NP";
-                case "Central Asia": return "CA";
+                case "Central Asia": return "CAS";
                 default: return "?";
             }
         }

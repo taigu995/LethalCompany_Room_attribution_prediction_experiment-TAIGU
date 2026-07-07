@@ -35,9 +35,15 @@ namespace LethalCompanyRegionTag
                 LogSource.LogError($"[TAIGU] Failed to apply SteamLobbyManager patches: {ex.Message}");
             }
 
-            // Create RegionTagManager GameObject
-            var managerObj = new GameObject("[TAIGU] RegionTagManager");
-            managerObj.AddComponent<UI.RegionTagManager>();
+            try
+            {
+                HarmonyInstance.PatchAll(typeof(Patches.LobbySlotPatch));
+                LogSource.LogInfo("[TAIGU] Successfully patched: LobbySlotPatch");
+            }
+            catch (System.Exception ex)
+            {
+                LogSource.LogError($"[TAIGU] Failed to apply LobbySlot patches: {ex.Message}");
+            }
 
             // Log startup info
             LogSource.LogInfo($"[TAIGU] {PluginName} v{PluginVersion} loaded!");

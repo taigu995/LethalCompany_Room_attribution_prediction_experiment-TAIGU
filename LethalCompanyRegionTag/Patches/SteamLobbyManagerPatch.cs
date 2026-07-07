@@ -2,19 +2,24 @@ using HarmonyLib;
 using Steamworks;
 using Steamworks.Data;
 using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace LethalCompanyRegionTag.Patches
 {
     /// <summary>
     /// Patches SteamLobbyManager to capture lobby list data.
-    /// This patch was confirmed working in game logs.
     /// </summary>
     [HarmonyPatch(typeof(SteamLobbyManager))]
     public static class SteamLobbyManagerPatch
     {
         /// <summary>
-        /// Postfix for loadLobbyListAndFilter - captures the full lobby list
-        /// after Steam returns search results.
+        /// Current lobby list captured from the game.
+        /// </summary>
+        public static Lobby[] CurrentLobbyList { get; private set; }
+
+        /// <summary>
+        /// Postfix for loadLobbyListAndFilter - captures the full lobby list.
         /// </summary>
         [HarmonyPostfix]
         [HarmonyPatch(nameof(SteamLobbyManager.loadLobbyListAndFilter))]
@@ -25,13 +30,11 @@ namespace LethalCompanyRegionTag.Patches
                 if (lobbyList == null || lobbyList.Length == 0)
                     return;
 
+                CurrentLobbyList = lobbyList;
                 Plugin.LogSource.LogInfo($"[TAIGU] Captured {lobbyList.Length} lobbies from server list");
 
-                // Notify RegionTagManager about new lobby list
-                if (UI.RegionTagManager.Instance != null)
-                {
-                    UI.RegionTagManager.Instance.OnLobbyListReceived(lobbyList);
-                }
+                // Reset tagged slots so they get re-tagged
+                LobbySlotPatch.ResetTaggedSlots();
             }
             catch (Exception ex)
             {
@@ -48,12 +51,8 @@ namespace LethalCompanyRegionTag.Patches
         {
             try
             {
-                Plugin.LogSource.LogInfo("[TAIGU] Server list refresh requested, clearing cache for stale entries");
-                // Clear the tagged slots tracking so new slots get tagged
-                if (UI.RegionTagManager.Instance != null)
-                {
-                    UI.RegionTagManager.Instance.ClearTaggedSlots();
-                }
+                Plugin.LogSource.LogInfo("[TAIGU] Server list refresh requested");
+                LobbySlotPatch.ResetTaggedSlots();
             }
             catch (Exception ex)
             {

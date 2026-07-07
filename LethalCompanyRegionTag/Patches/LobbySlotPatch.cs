@@ -356,6 +356,7 @@ namespace LethalCompanyRegionTag.Patches
                 case "vietnam": return "VN";
                 case "thailand": return "TH";
                 case "western": return "WEST";
+                case "western europe": return "WEST";
                 case "eastern europe": return "EE";
                 case "southeast asia": return "SEA";
                 case "south asia": return "SAS";
@@ -370,6 +371,7 @@ namespace LethalCompanyRegionTag.Patches
                 case "balkans": return "BALK";
                 case "nordic": return "NORD";
                 case "iberia": return "IB";
+                case "other": return "OTHER";
                 default:
                     // Use first 2-4 chars of region name
                     if (region.Length <= 4) return region.ToUpper();

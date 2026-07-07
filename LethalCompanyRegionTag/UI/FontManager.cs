@@ -598,7 +598,19 @@ namespace LethalCompanyRegionTag.UI
                 case "AFRICA": return "非洲";
                 case "OTHER": case "Other": return "其他";
                 case "??": return "未知";
-                default: return regionCode;
+                default:
+                    // 尝试从 LobbySlotPatch 的字典中查找
+                    if (!CjkFontAvailable) return regionCode;
+                    try
+                    {
+                        var dict = Patches.LobbySlotPatch.RegionCodeToChinese;
+                        if (dict != null && dict.TryGetValue(regionCode, out var chineseName))
+                        {
+                            return chineseName;
+                        }
+                    }
+                    catch { }
+                    return regionCode;
             }
         }
     }

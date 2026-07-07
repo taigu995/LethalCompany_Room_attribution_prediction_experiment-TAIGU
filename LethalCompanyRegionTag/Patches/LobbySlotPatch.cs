@@ -381,9 +381,10 @@ namespace LethalCompanyRegionTag.Patches
 
         /// <summary>
         /// Region code to Chinese name mapping (lazy-initialized to avoid static constructor crashes)
+        /// Public for FontManager access
         /// </summary>
         private static System.Collections.Generic.Dictionary<string, string> _regionCodeToChinese;
-        private static System.Collections.Generic.Dictionary<string, string> RegionCodeToChinese
+        public static System.Collections.Generic.Dictionary<string, string> RegionCodeToChinese
         {
             get
             {

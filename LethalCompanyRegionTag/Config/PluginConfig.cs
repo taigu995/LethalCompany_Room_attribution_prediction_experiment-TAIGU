@@ -3,108 +3,56 @@ using BepInEx.Configuration;
 namespace LethalCompanyRegionTag.Config
 {
     /// <summary>
-    /// Plugin configuration managed through BepInEx config system.
+    /// Plugin configuration entries managed through BepInEx config system.
+    /// Config file is generated at: BepInEx/config/TAIGU.RoomRecognition.cfg
     /// </summary>
     public static class PluginConfig
     {
-        // === Steam API Settings ===
-        public static ConfigEntry<string> SteamWebApiKey;
-        public static ConfigEntry<bool> EnableCommunityQuery;
-        public static ConfigEntry<bool> EnableXmlQuery;
+        // --- Analysis Sources ---
+        public static ConfigEntry<bool> EnableNicknameAnalysis { get; private set; }
+        public static ConfigEntry<bool> EnableCommunityQuery { get; private set; }
+        public static ConfigEntry<bool> EnableXmlQuery { get; private set; }
+        public static ConfigEntry<string> SteamWebApiKey { get; private set; }
 
-        // === Display Settings ===
-        public static ConfigEntry<bool> ShowRegionTag;
-        public static ConfigEntry<bool> ShowProbability;
-        public static ConfigEntry<bool> ShowCountryCode;
-        public static ConfigEntry<float> TagFontSize;
-        public static ConfigEntry<string> TagColorChina;
-        public static ConfigEntry<string> TagColorJapan;
-        public static ConfigEntry<string> TagColorKorea;
-        public static ConfigEntry<string> TagColorRussia;
-        public static ConfigEntry<string> TagColorDefault;
+        // --- Display Settings ---
+        public static ConfigEntry<float> MinConfidenceThreshold { get; private set; }
+        public static ConfigEntry<bool> ShowLowConfidenceTags { get; private set; }
+        public static ConfigEntry<bool> ShowProbability { get; private set; }
 
-        // === Analysis Settings ===
-        public static ConfigEntry<bool> EnableNicknameAnalysis;
-        public static ConfigEntry<bool> EnableSteamApiQuery;
-        public static ConfigEntry<float> CacheTtlMinutes;
-        public static ConfigEntry<bool> AutoAnalyzeOnRefresh;
-
-        // === Debug Settings ===
-        public static ConfigEntry<bool> DebugLogging;
-
-        public static void Init(ConfigFile config)
+        public static void Init(ConfigFile configFile)
         {
-            // Steam API
-            SteamWebApiKey = config.Bind(
-                "Steam API", "WebApiKey", "",
-                "Your Steam Web API key (get one from https://steamcommunity.com/dev/apikey). Leave empty to disable Steam API queries.");
+            const string analysisSection = "Analysis Sources";
+            const string displaySection = "Display Settings";
 
-            EnableCommunityQuery = config.Bind(
-                "Steam API", "EnableCommunityQuery", true,
-                "Enable querying Steam Community profile pages for country info (no API key needed, but less reliable).");
+            EnableNicknameAnalysis = configFile.Bind(analysisSection,
+                "EnableNicknameAnalysis", true,
+                "Enable nickname language analysis (always works, no network needed). Analyzes Unicode character sets in lobby host names to detect language/region.");
 
-            EnableXmlQuery = config.Bind(
-                "Steam API", "EnableXmlQuery", true,
-                "Enable querying Steam XML profile endpoint as fallback.");
+            EnableCommunityQuery = configFile.Bind(analysisSection,
+                "EnableCommunityQuery", true,
+                "Enable Steam Community page query (no API key needed). Fetches the host's Steam profile page to extract country flag. May be slow or rate-limited.");
 
-            // Display
-            ShowRegionTag = config.Bind(
-                "Display", "ShowRegionTag", true,
-                "Show region tag next to lobby entries.");
+            EnableXmlQuery = configFile.Bind(analysisSection,
+                "EnableXmlQuery", true,
+                "Enable Steam XML profile query (fallback). Fetches the host's Steam profile in XML format to extract location info.");
 
-            ShowProbability = config.Bind(
-                "Display", "ShowProbability", true,
-                "Show probability percentage next to region tag.");
+            SteamWebApiKey = configFile.Bind(analysisSection,
+                "SteamWebApiKey", "",
+                "Steam Web API key for most accurate region detection. Get a free key from: https://steamcommunity.com/dev/apikey (requires Steam account). Leave empty to use other methods only.");
 
-            ShowCountryCode = config.Bind(
-                "Display", "ShowCountryCode", true,
-                "Show ISO country code in the tag (e.g., [CN], [JP]).");
+            MinConfidenceThreshold = configFile.Bind(displaySection,
+                "MinConfidenceThreshold", 20f,
+                new ConfigDescription(
+                    "Minimum confidence percentage (0-100) required to show a region tag. Tags below this threshold are hidden.",
+                    new AcceptableValueRange<float>(0f, 100f)));
 
-            TagFontSize = config.Bind(
-                "Display", "TagFontSize", 14f,
-                "Font size for region tags (10-24).");
+            ShowLowConfidenceTags = configFile.Bind(displaySection,
+                "ShowLowConfidenceTags", false,
+                "Show [??] tag for lobbies where no region could be determined at all.");
 
-            TagColorChina = config.Bind(
-                "Display", "ColorChina", "#FF4444",
-                "Color for China region tag (hex format).");
-
-            TagColorJapan = config.Bind(
-                "Display", "ColorJapan", "#FF69B4",
-                "Color for Japan region tag (hex format).");
-
-            TagColorKorea = config.Bind(
-                "Display", "ColorKorea", "#4169E1",
-                "Color for Korea region tag (hex format).");
-
-            TagColorRussia = config.Bind(
-                "Display", "ColorRussia", "#FF8C00",
-                "Color for Russia/CIS region tag (hex format).");
-
-            TagColorDefault = config.Bind(
-                "Display", "ColorDefault", "#AAAAAA",
-                "Default color for other region tags (hex format).");
-
-            // Analysis
-            EnableNicknameAnalysis = config.Bind(
-                "Analysis", "EnableNicknameAnalysis", true,
-                "Enable nickname language analysis for region detection.");
-
-            EnableSteamApiQuery = config.Bind(
-                "Analysis", "EnableSteamApiQuery", true,
-                "Enable Steam API queries for region detection (requires API key or community query).");
-
-            CacheTtlMinutes = config.Bind(
-                "Analysis", "CacheTtlMinutes", 10f,
-                "How long to cache region analysis results (in minutes).");
-
-            AutoAnalyzeOnRefresh = config.Bind(
-                "Analysis", "AutoAnalyzeOnRefresh", true,
-                "Automatically analyze lobbies when the server list is refreshed.");
-
-            // Debug
-            DebugLogging = config.Bind(
-                "Debug", "DebugLogging", false,
-                "Enable detailed debug logging.");
+            ShowProbability = configFile.Bind(displaySection,
+                "ShowProbability", true,
+                "Show probability percentage next to the region code (e.g. [CN 78%] instead of just [CN]).");
         }
     }
 }

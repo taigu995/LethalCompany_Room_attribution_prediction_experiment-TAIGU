@@ -5,63 +5,63 @@ namespace LethalCompanyRegionTag.Cache
 {
     /// <summary>
     /// Thread-safe cache for region analysis results.
-    /// Entries expire after a configurable TTL to allow re-analysis.
+    /// Uses Steam ID (ulong) as key with TTL-based expiration.
     /// </summary>
     public class RegionCache
     {
-        private readonly Dictionary<string, CacheEntry> _cache = new Dictionary<string, CacheEntry>();
-        private readonly object _lock = new object();
-        private readonly TimeSpan _ttl;
+        private static readonly Dictionary<ulong, CacheEntry> _cache = new Dictionary<ulong, CacheEntry>();
+        private static readonly object _lock = new object();
+        private static readonly TimeSpan DefaultTTL = TimeSpan.FromMinutes(10);
 
-        public RegionCache(TimeSpan? ttl = null)
+        private struct CacheEntry
         {
-            _ttl = ttl ?? TimeSpan.FromMinutes(10);
+            public Analysis.RegionResult Result;
+            public DateTime ExpiresAt;
         }
 
-        public bool TryGet(string steamId64, out Analysis.RegionResult result)
+        /// <summary>
+        /// Try to get a cached result for the given Steam ID.
+        /// </summary>
+        public static bool TryGet(ulong steamId, out Analysis.RegionResult result)
         {
             lock (_lock)
             {
-                if (_cache.TryGetValue(steamId64, out CacheEntry entry))
+                if (_cache.TryGetValue(steamId, out var entry))
                 {
-                    // Check if expired (but pending results never expire)
-                    if (!entry.Result.IsPending && DateTime.UtcNow - entry.CachedAt > _ttl)
+                    if (DateTime.UtcNow < entry.ExpiresAt)
                     {
-                        _cache.Remove(steamId64);
-                        result = null;
-                        return false;
+                        result = entry.Result;
+                        return true;
                     }
-
-                    result = entry.Result;
-                    return true;
+                    // Expired, remove it
+                    _cache.Remove(steamId);
                 }
             }
-
             result = null;
             return false;
         }
 
-        public void Set(string steamId64, Analysis.RegionResult result)
+        /// <summary>
+        /// Set a cached result for the given Steam ID.
+        /// </summary>
+        public static void Set(ulong steamId, Analysis.RegionResult result)
         {
+            if (steamId == 0 || result == null) return;
+
             lock (_lock)
             {
-                _cache[steamId64] = new CacheEntry
+                _cache[steamId] = new CacheEntry
                 {
                     Result = result,
-                    CachedAt = DateTime.UtcNow
+                    ExpiresAt = DateTime.UtcNow + DefaultTTL
                 };
             }
         }
 
-        public void Remove(string steamId64)
-        {
-            lock (_lock)
-            {
-                _cache.Remove(steamId64);
-            }
-        }
-
-        public void Clear()
+        /// <summary>
+        /// Clear all cached results.
+        /// </summary>
+        public static void Clear()
         {
             lock (_lock)
             {
@@ -69,42 +69,23 @@ namespace LethalCompanyRegionTag.Cache
             }
         }
 
-        public int Count
-        {
-            get
-            {
-                lock (_lock)
-                {
-                    return _cache.Count;
-                }
-            }
-        }
-
         /// <summary>
         /// Remove expired entries to free memory.
         /// </summary>
-        public void Cleanup()
+        public static void Cleanup()
         {
             lock (_lock)
             {
-                var expired = new List<string>();
                 var now = DateTime.UtcNow;
-
+                var expired = new List<ulong>();
                 foreach (var kvp in _cache)
                 {
-                    if (!kvp.Value.Result.IsPending && now - kvp.Value.CachedAt > _ttl)
+                    if (now >= kvp.Value.ExpiresAt)
                         expired.Add(kvp.Key);
                 }
-
                 foreach (var key in expired)
                     _cache.Remove(key);
             }
-        }
-
-        private class CacheEntry
-        {
-            public Analysis.RegionResult Result { get; set; }
-            public DateTime CachedAt { get; set; }
         }
     }
 }

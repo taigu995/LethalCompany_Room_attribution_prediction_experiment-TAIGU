@@ -10,7 +10,7 @@ namespace LethalCompanyRegionTag
     {
         public const string PluginGUID = "TAIGU.RoomRecognition";
         public const string PluginName = "TAIGU-Room recognition experiment";
-        public const string PluginVersion = "1.1.0";
+        public const string PluginVersion = "1.2.0";
 
         public static Plugin Instance { get; private set; }
         internal static BepInEx.Logging.ManualLogSource LogSource => Instance.Logger;

@@ -2,6 +2,7 @@ using HarmonyLib;
 using Steamworks;
 using Steamworks.Data;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
@@ -10,8 +11,9 @@ namespace LethalCompanyRegionTag.Patches
 {
     /// <summary>
     /// Patches LobbySlot to add region tags to the display.
-    /// Reads the already-displayed server name from LobbyName.text
-    /// instead of relying on lobby.Owner.Name (which is empty for non-friends).
+    /// Two-phase strategy:
+    ///   Phase 1 (instant): Nickname/language analysis from displayed server name
+    ///   Phase 2 (async): Steam Community page query for exact country code
     /// </summary>
     [HarmonyPatch(typeof(LobbySlot))]
     public static class LobbySlotPatch
@@ -19,11 +21,14 @@ namespace LethalCompanyRegionTag.Patches
         // Track which lobby slots have been tagged (by instance hash)
         private static HashSet<int> _taggedSlots = new HashSet<int>();
         
+        // Track slots that have completed Phase 2 (Steam web query)
+        private static HashSet<int> _webQueryDoneSlots = new HashSet<int>();
+        
         // Cache of analysis results by lobby ID
         private static Dictionary<ulong, Analysis.RegionResult> _resultCache = new Dictionary<ulong, Analysis.RegionResult>();
         
-        // Track ongoing analysis to avoid duplicates
-        private static HashSet<int> _pendingSlots = new HashSet<int>();
+        // Track ongoing async web queries to avoid duplicates
+        private static HashSet<int> _pendingWebQueries = new HashSet<int>();
 
         /// <summary>
         /// Reset tagged slots (called when server list is refreshed).
@@ -31,13 +36,16 @@ namespace LethalCompanyRegionTag.Patches
         public static void ResetTaggedSlots()
         {
             _taggedSlots.Clear();
-            _pendingSlots.Clear();
+            _webQueryDoneSlots.Clear();
+            _pendingWebQueries.Clear();
             _resultCache.Clear();
             Plugin.LogSource.LogInfo("[TAIGU] Reset tagged slots tracking");
         }
 
         /// <summary>
         /// Postfix for LobbySlot.Update - checks and tags each slot.
+        /// Phase 1: Instant nickname analysis
+        /// Phase 2: Async Steam Community query (upgrades the tag if successful)
         /// </summary>
         [HarmonyPostfix]
         [HarmonyPatch(nameof(LobbySlot.Update))]
@@ -45,18 +53,13 @@ namespace LethalCompanyRegionTag.Patches
         {
             try
             {
+                // Process any pending UI updates from background web queries (main thread)
+                ProcessPendingUpdates();
+
                 if (__instance == null)
                     return;
 
                 int instanceHash = __instance.GetHashCode();
-
-                // Skip if already tagged
-                if (_taggedSlots.Contains(instanceHash))
-                    return;
-
-                // Skip if pending analysis
-                if (_pendingSlots.Contains(instanceHash))
-                    return;
 
                 // Check if LobbyName text is available and has content
                 var lobbyNameText = __instance.LobbyName;
@@ -67,48 +70,159 @@ namespace LethalCompanyRegionTag.Patches
                 if (string.IsNullOrEmpty(displayedName) || string.IsNullOrWhiteSpace(displayedName))
                     return;
 
-                // Get lobby ID for caching
+                // Get lobby and owner info
                 var lobby = __instance.thisLobby;
                 ulong lobbyIdValue = 0;
-                try { lobbyIdValue = lobby.Id.Value; } catch { }
-
-                // Check cache first
-                if (lobbyIdValue != 0 && _resultCache.TryGetValue(lobbyIdValue, out var cachedResult))
-                {
-                    ApplyTag(__instance, cachedResult, displayedName);
-                    _taggedSlots.Add(instanceHash);
-                    return;
-                }
-
-                // Mark as pending
-                _pendingSlots.Add(instanceHash);
-
-                // Get owner Steam ID for additional queries
                 ulong ownerSteamId = 0;
+                try { lobbyIdValue = lobby.Id.Value; } catch { }
                 try { ownerSteamId = lobby.Owner.Id.Value; } catch { }
 
-                Plugin.LogSource.LogInfo($"[TAIGU] Analyzing slot: displayedName='{displayedName}', lobbyId={lobbyIdValue}, ownerSteamId={ownerSteamId}");
+                // === Phase 1: Instant nickname analysis (runs once per slot) ===
+                if (!_taggedSlots.Contains(instanceHash))
+                {
+                    // Check cache first
+                    if (lobbyIdValue != 0 && _resultCache.TryGetValue(lobbyIdValue, out var cachedResult))
+                    {
+                        ApplyTag(__instance, cachedResult, displayedName);
+                        _taggedSlots.Add(instanceHash);
+                        // If cached result is from web query, skip Phase 2
+                        if (cachedResult.Source == "Steam Community" || cachedResult.Source == "Steam XML" || cachedResult.Source == "Steam Web API")
+                            _webQueryDoneSlots.Add(instanceHash);
+                        return;
+                    }
 
-                // Run analysis using the DISPLAYED server name (not lobby.Owner.Name which is empty)
-                var result = Analysis.RegionAnalyzer.AnalyzeRegion(displayedName, ownerSteamId).GetAwaiter().GetResult();
+                    // Run quick nickname analysis (synchronous, instant)
+                    var quickResult = Analysis.RegionAnalyzer.GetQuickAnalysis(displayedName);
+                    
+                    Plugin.LogSource.LogInfo($"[TAIGU] Phase 1 (nickname): displayedName='{displayedName}', primary={quickResult.PrimaryRegion}, confidence={quickResult.Confidence:F0}%");
 
-                Plugin.LogSource.LogInfo($"[TAIGU] Analysis result: primary={result.PrimaryRegion}, confidence={result.Confidence:F0}%, source={result.Source}");
+                    // Apply the quick tag immediately
+                    ApplyTag(__instance, quickResult, displayedName);
+                    _taggedSlots.Add(instanceHash);
 
-                // Cache the result
-                if (lobbyIdValue != 0)
-                    _resultCache[lobbyIdValue] = result;
+                    // Cache the quick result
+                    if (lobbyIdValue != 0)
+                        _resultCache[lobbyIdValue] = quickResult;
 
-                // Apply the tag
-                ApplyTag(__instance, result, displayedName);
-                _taggedSlots.Add(instanceHash);
-                _pendingSlots.Remove(instanceHash);
+                    // === Phase 2: Start async Steam web query (if we have an owner Steam ID) ===
+                    if (ownerSteamId != 0 && !_webQueryDoneSlots.Contains(instanceHash) && !_pendingWebQueries.Contains(instanceHash))
+                    {
+                        _pendingWebQueries.Add(instanceHash);
+                        
+                        Plugin.LogSource.LogInfo($"[TAIGU] Phase 2: Starting Steam web query for ownerSteamId={ownerSteamId}");
+                        
+                        // Start async web query - will update the tag when complete
+                        StartWebQueryAsync(__instance, instanceHash, lobbyIdValue, ownerSteamId, displayedName);
+                    }
+                }
             }
             catch (Exception ex)
             {
                 Plugin.LogSource.LogWarning($"[TAIGU] Error in LobbySlot.Update postfix: {ex.Message}\n{ex.StackTrace}");
-                // Remove from pending on error so it can retry
                 if (__instance != null)
-                    _pendingSlots.Remove(__instance.GetHashCode());
+                    _pendingWebQueries.Remove(__instance.GetHashCode());
+            }
+        }
+
+        /// <summary>
+        /// Starts an async web query to get the owner's country code from Steam.
+        /// Uses a background thread to avoid blocking the game.
+        /// </summary>
+        private static void StartWebQueryAsync(LobbySlot slot, int instanceHash, ulong lobbyId, ulong ownerSteamId, string displayedName)
+        {
+            // Use ThreadPool to run the async query without blocking the game thread
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    // Run the full async analysis (Steam Community + XML queries)
+                    var webResult = Analysis.SteamWebQuery.QueryAllSources(ownerSteamId.ToString()).GetAwaiter().GetResult();
+                    
+                    if (webResult != null && !string.IsNullOrEmpty(webResult.CountryCode))
+                    {
+                        // Got a country code from Steam - build a high-confidence result
+                        var enhancedResult = new Analysis.RegionResult
+                        {
+                            Source = webResult.Source,
+                            CountryCode = webResult.CountryCode,
+                            PrimaryRegion = Analysis.RegionAnalyzer.CountryCodeToRegion(webResult.CountryCode),
+                            Confidence = webResult.Confidence,
+                            Probabilities = BuildWebQueryProbabilityMap(webResult.CountryCode, webResult.Confidence)
+                        };
+
+                        Plugin.LogSource.LogInfo($"[TAIGU] Phase 2 complete: countryCode={webResult.CountryCode}, region={enhancedResult.PrimaryRegion}, confidence={enhancedResult.Confidence:F0}%, source={webResult.Source}");
+
+                        // Update cache
+                        if (lobbyId != 0)
+                            _resultCache[lobbyId] = enhancedResult;
+
+                        // Schedule UI update on main thread
+                        // We use a coroutine-like approach with a flag
+                        _pendingUpdateQueue.Enqueue(new PendingUpdate
+                        {
+                            InstanceHash = instanceHash,
+                            Slot = slot,
+                            Result = enhancedResult,
+                            DisplayedName = displayedName
+                        });
+                        _hasPendingUpdate = true;
+                    }
+                    else
+                    {
+                        Plugin.LogSource.LogInfo($"[TAIGU] Phase 2: No country code found for ownerSteamId={ownerSteamId}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Plugin.LogSource.LogWarning($"[TAIGU] Phase 2 error: {ex.Message}");
+                }
+                finally
+                {
+                    _pendingWebQueries.Remove(instanceHash);
+                    _webQueryDoneSlots.Add(instanceHash);
+                }
+            });
+        }
+
+        // Thread-safe queue for pending UI updates
+        private static Queue<PendingUpdate> _pendingUpdateQueue = new Queue<PendingUpdate>();
+        private static volatile bool _hasPendingUpdate = false;
+
+        private struct PendingUpdate
+        {
+            public int InstanceHash;
+            public LobbySlot Slot;
+            public Analysis.RegionResult Result;
+            public string DisplayedName;
+        }
+
+        /// <summary>
+        /// Called from the game's main thread to process pending UI updates.
+        /// This should be called from a Harmony patch on a main-thread method.
+        /// </summary>
+        public static void ProcessPendingUpdates()
+        {
+            if (!_hasPendingUpdate) return;
+
+            lock (_pendingUpdateQueue)
+            {
+                while (_pendingUpdateQueue.Count > 0)
+                {
+                    var update = _pendingUpdateQueue.Dequeue();
+                    try
+                    {
+                        if (update.Slot != null && update.Slot.LobbyName != null)
+                        {
+                            ApplyTag(update.Slot, update.Result, update.DisplayedName);
+                            Plugin.LogSource.LogInfo($"[TAIGU] Updated tag from web query: {update.Result.PrimaryRegion} ({update.Result.Confidence:F0}%)");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Plugin.LogSource.LogWarning($"[TAIGU] Error processing pending update: {ex.Message}");
+                    }
+                }
+                _hasPendingUpdate = false;
             }
         }
 
@@ -141,12 +255,9 @@ namespace LethalCompanyRegionTag.Patches
 
                 Plugin.LogSource.LogInfo($"[TAIGU] Applied tag: '{tag}' to slot (confidence: {result.Confidence:F0}%)");
 
-                // Restore original text color after a frame would be ideal,
-                // but since we only do this once per slot, we keep the tag color
-                // for the tag portion using rich text if supported
+                // Use rich text to color only the tag portion if supported
                 if (slot.LobbyName.richText)
                 {
-                    // Use rich text to color only the tag portion
                     string colorHex = ColorToHex(GetTagColor(result.Confidence));
                     slot.LobbyName.text = $"{originalText}  <color=#{colorHex}>{tag}</color>";
                 }
@@ -155,6 +266,21 @@ namespace LethalCompanyRegionTag.Patches
             {
                 Plugin.LogSource.LogWarning($"[TAIGU] Error applying tag: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Build probability map for web query results (high confidence, single country).
+        /// </summary>
+        private static Dictionary<string, float> BuildWebQueryProbabilityMap(string countryCode, float confidence)
+        {
+            var probs = new Dictionary<string, float>();
+            string region = Analysis.RegionAnalyzer.CountryCodeToRegion(countryCode);
+            probs[region] = confidence;
+            
+            float remaining = 100f - confidence;
+            probs["Other"] = remaining;
+            
+            return probs;
         }
 
         private static string BuildTag(Analysis.RegionResult result)
@@ -169,10 +295,17 @@ namespace LethalCompanyRegionTag.Patches
                 code = GetRegionCode(result.PrimaryRegion);
             }
 
+            // Add source indicator for web query results
+            string sourceIndicator = "";
+            if (result.Source == "Steam Community" || result.Source == "Steam XML" || result.Source == "Steam Web API")
+            {
+                sourceIndicator = "*"; // Asterisk indicates verified from Steam profile
+            }
+
             // Build full probability distribution string
-            // Format: [CN] 78% | JP 8% | KR 5% | Other 9%
+            // Format: [CN]* 95% | Other 5%  (* = Steam verified)
             var parts = new System.Collections.Generic.List<string>();
-            parts.Add($"[{code}] {result.Confidence:F0}%");
+            parts.Add($"[{code}]{sourceIndicator} {result.Confidence:F0}%");
 
             if (result.Probabilities != null)
             {
@@ -200,122 +333,60 @@ namespace LethalCompanyRegionTag.Patches
             if (string.IsNullOrEmpty(region))
                 return "??";
 
-            // Map region names to short ASCII codes (2-5 chars max)
-            // East Asia
-            if (region.Contains("China (TW")) return "TW";
-            if (region.Contains("China")) return "CN";
-            if (region.Contains("Japan")) return "JP";
-            if (region.Contains("Korea")) return "KR";
-            if (region.Contains("Mongolia")) return "MN";
+            // Direct country code mapping
+            string code = Analysis.RegionAnalyzer.RegionToCountryCode(region);
+            if (!string.IsNullOrEmpty(code))
+                return code;
 
-            // Southeast Asia
-            if (region.Contains("Vietnam")) return "VN";
-            if (region.Contains("Thailand")) return "TH";
-            if (region.Contains("Indonesia")) return "ID";
-            if (region.Contains("Philippines")) return "PH";
-            if (region.Contains("Malaysia")) return "MY";
-            if (region.Contains("Singapore")) return "SG";
-            if (region.Contains("Cambodia")) return "KH";
-            if (region.Contains("Laos")) return "LA";
-            if (region.Contains("Myanmar")) return "MM";
-            if (region.Contains("Southeast Asia")) return "SEA";
-
-            // South Asia
-            if (region.Contains("India")) return "IN";
-            if (region.Contains("Pakistan")) return "PK";
-            if (region.Contains("Bangladesh")) return "BD";
-            if (region.Contains("Sri Lanka")) return "LK";
-            if (region.Contains("Nepal")) return "NP";
-
-            // Middle East / Central Asia
-            if (region.Contains("Turkey")) return "TR";
-            if (region.Contains("Saudi Arabia")) return "SA";
-            if (region.Contains("UAE")) return "AE";
-            if (region.Contains("Iran")) return "IR";
-            if (region.Contains("Israel")) return "IL";
-            if (region.Contains("Middle East")) return "MENA";
-            if (region.Contains("Kazakhstan")) return "KZ";
-            if (region.Contains("Georgia")) return "GE";
-            if (region.Contains("Armenia")) return "AM";
-
-            // Africa
-            if (region.Contains("Egypt")) return "EG";
-            if (region.Contains("Morocco")) return "MA";
-            if (region.Contains("Algeria")) return "DZ";
-            if (region.Contains("South Africa")) return "ZA";
-            if (region.Contains("Ethiopia")) return "ET";
-            if (region.Contains("North Africa")) return "NAF";
-
-            // Russia / CIS
-            if (region.Contains("Russia")) return "RU";
-            if (region.Contains("Ukraine")) return "UA";
-            if (region.Contains("Belarus")) return "BY";
-            if (region.Contains("CIS")) return "CIS";
-
-            // Eastern Europe
-            if (region.Contains("Poland")) return "PL";
-            if (region.Contains("Czech")) return "CZ";
-            if (region.Contains("Slovakia")) return "SK";
-            if (region.Contains("Hungary")) return "HU";
-            if (region.Contains("Romania")) return "RO";
-            if (region.Contains("Bulgaria")) return "BG";
-            if (region.Contains("Croatia")) return "HR";
-            if (region.Contains("Serbia")) return "RS";
-            if (region.Contains("Baltics")) return "BAL";
-            if (region.Contains("Eastern Europe")) return "EE";
-
-            // Western Europe
-            if (region.Contains("Germany")) return "DE";
-            if (region.Contains("Austria")) return "AT";
-            if (region.Contains("France")) return "FR";
-            if (region.Contains("Italy")) return "IT";
-            if (region.Contains("Iberia")) return "IB";
-            if (region.Contains("Benelux")) return "BEN";
-            if (region.Contains("UK") || region.Contains("Britain")) return "GB";
-            if (region.Contains("Greece")) return "GR";
-            if (region.Contains("Nordic")) return "NORD";
-            if (region.Contains("Sweden")) return "SE";
-            if (region.Contains("Norway")) return "NO";
-            if (region.Contains("Denmark")) return "DK";
-            if (region.Contains("Finland")) return "FI";
-            if (region.Contains("Switzerland")) return "CH";
-
-            // Americas
-            if (region.Contains("North America") || region.Contains("USA")) return "US";
-            if (region.Contains("Brazil")) return "BR";
-            if (region.Contains("Mexico")) return "MX";
-            if (region.Contains("Argentina")) return "AR";
-            if (region.Contains("Latin America")) return "LAT";
-            if (region.Contains("Americas")) return "AM";
-
-            // Oceania
-            if (region.Contains("Oceania")) return "OCE";
-            if (region.Contains("Australia")) return "AU";
-
-            // Western generic
-            if (region.Contains("Western")) return "WEST";
-
-            // Fallback: first 2-3 chars uppercase
-            return region.Length >= 2 ? region.Substring(0, Math.Min(region.Length, 3)).ToUpper() : "??";
+            // Fallback abbreviations
+            switch (region.ToLower())
+            {
+                case "china": return "CN";
+                case "japan": return "JP";
+                case "korea": return "KR";
+                case "russia": return "RU";
+                case "vietnam": return "VN";
+                case "thailand": return "TH";
+                case "western": return "WEST";
+                case "eastern europe": return "EE";
+                case "southeast asia": return "SEA";
+                case "south asia": return "SA";
+                case "central asia": return "CA";
+                case "middle east": return "ME";
+                case "south america": return "LATAM";
+                case "central america": return "LATAM";
+                case "north africa": return "NA";
+                case "sub-saharan africa": return "SSA";
+                case "oceania": return "OC";
+                case "baltic": return "BLT";
+                case "balkans": return "BALK";
+                case "nordic": return "NORD";
+                case "iberia": return "IB";
+                default:
+                    // Use first 2-4 chars of region name
+                    if (region.Length <= 4) return region.ToUpper();
+                    return region.Substring(0, 4).ToUpper();
+            }
         }
 
         private static UnityEngine.Color GetTagColor(float confidence)
         {
-            if (confidence >= 80f)
-                return new UnityEngine.Color(0.2f, 1f, 0.2f); // Green - high confidence
-            if (confidence >= 50f)
-                return new UnityEngine.Color(1f, 1f, 0.2f); // Yellow - medium confidence
-            if (confidence >= 20f)
-                return new UnityEngine.Color(1f, 0.6f, 0.2f); // Orange - low confidence
-            return new UnityEngine.Color(0.7f, 0.7f, 0.7f); // Gray - very low
+            // Steam-verified results get a brighter color
+            if (confidence >= 85f)
+                return new UnityEngine.Color(0.2f, 1f, 0.2f); // Bright green (verified)
+            if (confidence >= 60f)
+                return new UnityEngine.Color(0.4f, 0.9f, 0.4f); // Green
+            if (confidence >= 40f)
+                return new UnityEngine.Color(1f, 0.9f, 0.3f); // Yellow
+            return new UnityEngine.Color(0.7f, 0.7f, 0.7f); // Gray (low confidence)
         }
 
         private static string ColorToHex(UnityEngine.Color color)
         {
-            byte r = (byte)(color.r * 255);
-            byte g = (byte)(color.g * 255);
-            byte b = (byte)(color.b * 255);
-            return $"{r:X2}{g:X2}{b:X2}";
+            int r = (int)(color.r * 255);
+            int g = (int)(color.g * 255);
+            int b = (int)(color.b * 255);
+            return $"{r:X2}{g:X2}{b:B2}";
         }
     }
 }

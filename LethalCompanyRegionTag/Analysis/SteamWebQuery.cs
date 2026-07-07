@@ -120,6 +120,70 @@ namespace LethalCompanyRegionTag.Analysis
         }
 
         /// <summary>
+        /// Combined query that tries all web sources in order.
+        /// Returns a WebQueryResult with country code and source info.
+        /// </summary>
+        public static async Task<WebQueryResult> QueryAllSources(string steamId64)
+        {
+            var result = new WebQueryResult();
+
+            if (string.IsNullOrEmpty(steamId64))
+                return result;
+
+            // Try Steam Web API first (if key configured)
+            string apiKey = Config.PluginConfig.SteamWebApiKey.Value;
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                string code = await GetCountryFromWebApi(steamId64, apiKey);
+                if (!string.IsNullOrEmpty(code))
+                {
+                    result.CountryCode = code;
+                    result.Source = "Steam Web API";
+                    result.Confidence = 95f;
+                    return result;
+                }
+            }
+
+            // Try Steam Community page (no API key needed)
+            if (Config.PluginConfig.EnableCommunityQuery.Value)
+            {
+                string code = await GetCountryFromCommunityPage(steamId64);
+                if (!string.IsNullOrEmpty(code))
+                {
+                    result.CountryCode = code;
+                    result.Source = "Steam Community";
+                    result.Confidence = 88f;
+                    return result;
+                }
+            }
+
+            // Try Steam XML profile (fallback)
+            if (Config.PluginConfig.EnableXmlQuery.Value)
+            {
+                string code = await GetCountryFromXml(steamId64);
+                if (!string.IsNullOrEmpty(code))
+                {
+                    result.CountryCode = code;
+                    result.Source = "Steam XML";
+                    result.Confidence = 85f;
+                    return result;
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Result from a web query.
+        /// </summary>
+        public class WebQueryResult
+        {
+            public string CountryCode;
+            public string Source;
+            public float Confidence;
+        }
+
+        /// <summary>
         /// Attempts to extract a country code from a free-form location string.
         /// </summary>
         private static string TryExtractCountryFromLocation(string location)

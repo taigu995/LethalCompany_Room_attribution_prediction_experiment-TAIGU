@@ -236,7 +236,7 @@ namespace LethalCompanyRegionTag.Patches
                     return;
                 }
 
-                // Build the tag string (ASCII only to avoid font issues)
+                // Build the tag string (uses Chinese names if CJK font available)
                 string tag = BuildTag(result);
                 
                 if (string.IsNullOrEmpty(tag))
@@ -244,6 +244,9 @@ namespace LethalCompanyRegionTag.Patches
                     Plugin.LogSource.LogInfo("[TAIGU] No tag to apply (unknown region)");
                     return;
                 }
+
+                // Apply CJK font support to the text component
+                UI.FontManager.ApplyFontSupport(slot.LobbyName);
 
                 // Append tag to the original text
                 string newText = $"{originalText}  {tag}";
@@ -424,17 +427,17 @@ namespace LethalCompanyRegionTag.Patches
             };
 
         /// <summary>
-        /// Get display label for a region code - Chinese or English based on config
+        /// Get display label for a region code - Chinese or English based on config and font availability
         /// </summary>
         private static string GetDisplayLabel(string regionCode)
         {
             if (string.IsNullOrEmpty(regionCode))
                 return "??";
 
-            if (Config.PluginConfig.UseChineseDisplay.Value)
+            // Only use Chinese names if both config is enabled AND CJK font is available
+            if (Config.PluginConfig.UseChineseDisplay.Value && UI.FontManager.CjkFontAvailable)
             {
-                if (RegionCodeToChinese.TryGetValue(regionCode, out string chinese))
-                    return chinese;
+                return UI.FontManager.GetDisplayLabel(regionCode);
             }
 
             return regionCode;
@@ -457,7 +460,7 @@ namespace LethalCompanyRegionTag.Patches
             int r = (int)(color.r * 255);
             int g = (int)(color.g * 255);
             int b = (int)(color.b * 255);
-            return $"{r:X2}{g:X2}{b:B2}";
+            return $"{r:X2}{g:X2}{b:X2}";
         }
     }
 }

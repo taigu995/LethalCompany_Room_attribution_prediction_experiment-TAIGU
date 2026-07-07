@@ -10,7 +10,7 @@ namespace LethalCompanyRegionTag
     {
         public const string PluginGUID = "TAIGU.RoomRecognition";
         public const string PluginName = "TAIGU-Room recognition experiment";
-        public const string PluginVersion = "1.3.0";
+        public const string PluginVersion = "1.4.0";
 
         public static Plugin Instance { get; private set; }
         internal static BepInEx.Logging.ManualLogSource LogSource => Instance.Logger;
@@ -45,9 +45,13 @@ namespace LethalCompanyRegionTag
                 LogSource.LogError($"[TAIGU] Failed to apply LobbySlot patches: {ex.Message}");
             }
 
+            // Initialize font manager for CJK support
+            UI.FontManager.Initialize();
+
             // Log startup info
             LogSource.LogInfo($"[TAIGU] {PluginName} v{PluginVersion} loaded!");
             LogSource.LogInfo($"[TAIGU] Region detection enabled: Nickname={PluginCfg.EnableNicknameAnalysis.Value}, SteamAPI={!string.IsNullOrEmpty(PluginCfg.SteamWebApiKey.Value)}");
+            LogSource.LogInfo($"[TAIGU] CJK font available: {UI.FontManager.CjkFontAvailable}");
             LogSource.LogInfo($"[TAIGU] Community query: {PluginCfg.EnableCommunityQuery.Value}, XML query: {PluginCfg.EnableXmlQuery.Value}");
 
             if (string.IsNullOrEmpty(PluginCfg.SteamWebApiKey.Value))

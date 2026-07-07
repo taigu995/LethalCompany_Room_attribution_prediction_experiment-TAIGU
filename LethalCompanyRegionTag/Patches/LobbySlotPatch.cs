@@ -10,26 +10,29 @@ namespace LethalCompanyRegionTag.Patches
 {
     /// <summary>
     /// Patches LobbySlot to add region tags to the display.
+    /// Reads the already-displayed server name from LobbyName.text
+    /// instead of relying on lobby.Owner.Name (which is empty for non-friends).
     /// </summary>
     [HarmonyPatch(typeof(LobbySlot))]
     public static class LobbySlotPatch
     {
-        // Track which lobby IDs have been tagged
-        private static HashSet<ulong> _taggedLobbyIds = new HashSet<ulong>();
+        // Track which lobby slots have been tagged (by instance hash)
+        private static HashSet<int> _taggedSlots = new HashSet<int>();
         
-        // Cache of analysis results
+        // Cache of analysis results by lobby ID
         private static Dictionary<ulong, Analysis.RegionResult> _resultCache = new Dictionary<ulong, Analysis.RegionResult>();
         
-        // Track ongoing analysis tasks
-        private static HashSet<ulong> _pendingAnalysis = new HashSet<ulong>();
+        // Track ongoing analysis to avoid duplicates
+        private static HashSet<int> _pendingSlots = new HashSet<int>();
 
         /// <summary>
         /// Reset tagged slots (called when server list is refreshed).
         /// </summary>
         public static void ResetTaggedSlots()
         {
-            _taggedLobbyIds.Clear();
-            _pendingAnalysis.Clear();
+            _taggedSlots.Clear();
+            _pendingSlots.Clear();
+            _resultCache.Clear();
             Plugin.LogSource.LogInfo("[TAIGU] Reset tagged slots tracking");
         }
 
@@ -45,105 +48,107 @@ namespace LethalCompanyRegionTag.Patches
                 if (__instance == null)
                     return;
 
-                // Get the lobby data from the slot
-                var lobby = __instance.thisLobby;
-                ulong lobbyIdValue = lobby.Id.Value;
+                int instanceHash = __instance.GetHashCode();
 
                 // Skip if already tagged
-                if (_taggedLobbyIds.Contains(lobbyIdValue))
+                if (_taggedSlots.Contains(instanceHash))
                     return;
 
-                // Skip if lobby ID is invalid
-                if (lobbyIdValue == 0)
+                // Skip if pending analysis
+                if (_pendingSlots.Contains(instanceHash))
                     return;
 
-                // Mark as pending to avoid duplicate analysis
-                if (_pendingAnalysis.Contains(lobbyIdValue))
+                // Check if LobbyName text is available and has content
+                var lobbyNameText = __instance.LobbyName;
+                if (lobbyNameText == null)
                     return;
 
-                _pendingAnalysis.Add(lobbyIdValue);
+                string displayedName = lobbyNameText.text;
+                if (string.IsNullOrEmpty(displayedName) || string.IsNullOrWhiteSpace(displayedName))
+                    return;
+
+                // Get lobby ID for caching
+                var lobby = __instance.thisLobby;
+                ulong lobbyIdValue = 0;
+                try { lobbyIdValue = lobby.Id.Value; } catch { }
 
                 // Check cache first
-                if (_resultCache.TryGetValue(lobbyIdValue, out var cachedResult))
+                if (lobbyIdValue != 0 && _resultCache.TryGetValue(lobbyIdValue, out var cachedResult))
                 {
-                    ApplyTag(__instance, cachedResult);
-                    _taggedLobbyIds.Add(lobbyIdValue);
-                    _pendingAnalysis.Remove(lobbyIdValue);
+                    ApplyTag(__instance, cachedResult, displayedName);
+                    _taggedSlots.Add(instanceHash);
                     return;
                 }
 
-                // Start async analysis
-                StartAnalysis(__instance, lobby);
-            }
-            catch (Exception ex)
-            {
-                Plugin.LogSource.LogWarning($"[TAIGU] Error in LobbySlot.Update postfix: {ex.Message}");
-            }
-        }
+                // Mark as pending
+                _pendingSlots.Add(instanceHash);
 
-        private static void StartAnalysis(LobbySlot slot, Lobby lobby)
-        {
-            ulong lobbyIdValue = lobby.Id.Value;
+                // Get owner Steam ID for additional queries
+                ulong ownerSteamId = 0;
+                try { ownerSteamId = lobby.Owner.Id.Value; } catch { }
 
-            try
-            {
-                // Get owner info
-                Friend owner = lobby.Owner;
-                string ownerName = owner.Name ?? "Unknown";
-                ulong ownerSteamId = owner.Id.Value;
+                Plugin.LogSource.LogInfo($"[TAIGU] Analyzing slot: displayedName='{displayedName}', lobbyId={lobbyIdValue}, ownerSteamId={ownerSteamId}");
 
-                Plugin.LogSource.LogInfo($"[TAIGU] Analyzing lobby {lobbyIdValue}, owner: {ownerName}");
+                // Run analysis using the DISPLAYED server name (not lobby.Owner.Name which is empty)
+                var result = Analysis.RegionAnalyzer.AnalyzeRegion(displayedName, ownerSteamId).GetAwaiter().GetResult();
 
-                // Run analysis synchronously for now (nickname analysis is fast)
-                var result = Analysis.RegionAnalyzer.AnalyzeRegion(ownerName, ownerSteamId).GetAwaiter().GetResult();
+                Plugin.LogSource.LogInfo($"[TAIGU] Analysis result: primary={result.PrimaryRegion}, confidence={result.Confidence:F0}%, source={result.Source}");
 
                 // Cache the result
-                _resultCache[lobbyIdValue] = result;
+                if (lobbyIdValue != 0)
+                    _resultCache[lobbyIdValue] = result;
 
                 // Apply the tag
-                ApplyTag(slot, result);
-                _taggedLobbyIds.Add(lobbyIdValue);
-                _pendingAnalysis.Remove(lobbyIdValue);
+                ApplyTag(__instance, result, displayedName);
+                _taggedSlots.Add(instanceHash);
+                _pendingSlots.Remove(instanceHash);
             }
             catch (Exception ex)
             {
-                Plugin.LogSource.LogWarning($"[TAIGU] Error analyzing lobby {lobbyIdValue}: {ex.Message}");
-                _pendingAnalysis.Remove(lobbyIdValue);
+                Plugin.LogSource.LogWarning($"[TAIGU] Error in LobbySlot.Update postfix: {ex.Message}\n{ex.StackTrace}");
+                // Remove from pending on error so it can retry
+                if (__instance != null)
+                    _pendingSlots.Remove(__instance.GetHashCode());
             }
         }
 
-        private static void ApplyTag(LobbySlot slot, Analysis.RegionResult result)
+        private static void ApplyTag(LobbySlot slot, Analysis.RegionResult result, string originalText)
         {
-            if (slot == null || slot.LobbyName == null)
-                return;
-
             try
             {
-                string originalName = slot.LobbyName.text ?? "";
-
-                // Remove any existing tag we may have added
-                originalName = RemoveExistingTag(originalName);
-
-                if (result == null || result.PrimaryRegion == "Unknown" || result.Confidence < 20f)
+                if (slot.LobbyName == null)
                 {
-                    // Low confidence or unknown
-                    if (Config.PluginConfig.ShowLowConfidenceTags.Value)
-                    {
-                        string tag = FormatTag("??", 0f);
-                        slot.LobbyName.text = $"{tag} {originalName}";
-                    }
+                    Plugin.LogSource.LogWarning("[TAIGU] LobbyName is null, cannot apply tag");
                     return;
                 }
 
-                // Format the tag
-                string regionCode = GetRegionCode(result.PrimaryRegion);
-                float confidence = result.Confidence;
-
-                // Only show tag if confidence is above threshold
-                if (confidence >= Config.PluginConfig.MinConfidenceThreshold.Value)
+                // Build the tag string (ASCII only to avoid font issues)
+                string tag = BuildTag(result);
+                
+                if (string.IsNullOrEmpty(tag))
                 {
-                    string tag = FormatTag(regionCode, confidence);
-                    slot.LobbyName.text = $"{tag} {originalName}";
+                    Plugin.LogSource.LogInfo("[TAIGU] No tag to apply (unknown region)");
+                    return;
+                }
+
+                // Append tag to the original text
+                string newText = $"{originalText}  {tag}";
+                
+                // Save original color and apply tag color
+                var originalColor = slot.LobbyName.color;
+                slot.LobbyName.text = newText;
+                slot.LobbyName.color = GetTagColor(result.Confidence);
+
+                Plugin.LogSource.LogInfo($"[TAIGU] Applied tag: '{tag}' to slot (confidence: {result.Confidence:F0}%)");
+
+                // Restore original text color after a frame would be ideal,
+                // but since we only do this once per slot, we keep the tag color
+                // for the tag portion using rich text if supported
+                if (slot.LobbyName.richText)
+                {
+                    // Use rich text to color only the tag portion
+                    string colorHex = ColorToHex(GetTagColor(result.Confidence));
+                    slot.LobbyName.text = $"{originalText}  <color=#{colorHex}>{tag}</color>";
                 }
             }
             catch (Exception ex)
@@ -152,31 +157,20 @@ namespace LethalCompanyRegionTag.Patches
             }
         }
 
-        private static string RemoveExistingTag(string text)
+        private static string BuildTag(Analysis.RegionResult result)
         {
-            if (string.IsNullOrEmpty(text))
-                return text;
+            if (result == null || result.PrimaryRegion == "Unknown" || result.Confidence < 10f)
+                return "";
 
-            // Remove tags like [CN 78%] or [JP] or [??]
-            int bracketStart = text.IndexOf('[');
-            if (bracketStart == 0)
+            // Get country code or region abbreviation
+            string code = result.CountryCode;
+            if (string.IsNullOrEmpty(code))
             {
-                int bracketEnd = text.IndexOf(']');
-                if (bracketEnd > bracketStart)
-                {
-                    return text.Substring(bracketEnd + 1).TrimStart();
-                }
+                // Use first letters of region name
+                code = GetRegionCode(result.PrimaryRegion);
             }
 
-            return text;
-        }
-
-        private static string FormatTag(string regionCode, float confidence)
-        {
-            if (Config.PluginConfig.ShowProbability.Value && confidence > 0f)
-                return $"[{regionCode} {confidence:F0}%]";
-            else
-                return $"[{regionCode}]";
+            return $"[{code}] {result.Confidence:F0}%";
         }
 
         private static string GetRegionCode(string region)
@@ -184,38 +178,57 @@ namespace LethalCompanyRegionTag.Patches
             if (string.IsNullOrEmpty(region))
                 return "??";
 
-            // Map region names to short codes
+            // Map common region names to codes
             if (region.Contains("China")) return "CN";
             if (region.Contains("Japan")) return "JP";
             if (region.Contains("Korea")) return "KR";
             if (region.Contains("Russia")) return "RU";
             if (region.Contains("Ukraine")) return "UA";
-            if (region.Contains("North America")) return "NA";
-            if (region.Contains("UK") || region.Contains("Ireland")) return "GB";
+            if (region.Contains("North America") || region.Contains("USA")) return "US";
+            if (region.Contains("UK") || region.Contains("Britain")) return "GB";
             if (region.Contains("Germany")) return "DE";
             if (region.Contains("France")) return "FR";
-            if (region.Contains("Italy")) return "IT";
-            if (region.Contains("Iberia") || region.Contains("Spain") || region.Contains("Portugal")) return "ES";
             if (region.Contains("Brazil")) return "BR";
-            if (region.Contains("Oceania") || region.Contains("Australia")) return "AU";
             if (region.Contains("India")) return "IN";
             if (region.Contains("Thailand")) return "TH";
             if (region.Contains("Southeast Asia")) return "SEA";
-            if (region.Contains("Turkey")) return "TR";
             if (region.Contains("Middle East")) return "ME";
+            if (region.Contains("Oceania")) return "AU";
             if (region.Contains("Latin America")) return "LATAM";
             if (region.Contains("Nordic")) return "NORD";
-            if (region.Contains("Benelux")) return "BEN";
+            if (region.Contains("Iberia")) return "IB";
             if (region.Contains("Eastern Europe")) return "EE";
             if (region.Contains("CIS")) return "CIS";
             if (region.Contains("Greece")) return "GR";
             if (region.Contains("Israel")) return "IL";
+            if (region.Contains("Turkey")) return "TR";
             if (region.Contains("Poland")) return "PL";
+            if (region.Contains("Italy")) return "IT";
+            if (region.Contains("Netherlands") || region.Contains("Belgium")) return "BEN";
             if (region.Contains("Western")) return "WEST";
             if (region.Contains("Americas")) return "AM";
 
-            // Return first 2-4 chars of the region name
-            return region.Length <= 4 ? region.ToUpper() : region.Substring(0, 3).ToUpper();
+            // Fallback: first 2-3 chars uppercase
+            return region.Length >= 2 ? region.Substring(0, 2).ToUpper() : "??";
+        }
+
+        private static UnityEngine.Color GetTagColor(float confidence)
+        {
+            if (confidence >= 80f)
+                return new UnityEngine.Color(0.2f, 1f, 0.2f); // Green - high confidence
+            if (confidence >= 50f)
+                return new UnityEngine.Color(1f, 1f, 0.2f); // Yellow - medium confidence
+            if (confidence >= 20f)
+                return new UnityEngine.Color(1f, 0.6f, 0.2f); // Orange - low confidence
+            return new UnityEngine.Color(0.7f, 0.7f, 0.7f); // Gray - very low
+        }
+
+        private static string ColorToHex(UnityEngine.Color color)
+        {
+            byte r = (byte)(color.r * 255);
+            byte g = (byte)(color.g * 255);
+            byte b = (byte)(color.b * 255);
+            return $"{r:X2}{g:X2}{b:X2}";
         }
     }
 }

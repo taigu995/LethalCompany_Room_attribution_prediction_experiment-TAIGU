@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyDescriptionAttribute("Lethal Company lobby region identification mod - identifies lobby host country/re" +
     "gion")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+11096458e350c340790d6a8fc3d9e19616623e8a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+24827dbe3d3db393759f3bb4e59cd368eec2fefa")]
 [assembly: System.Reflection.AssemblyProductAttribute("TAIGU-Room recognition experiment")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LethalCompanyRegionTag")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

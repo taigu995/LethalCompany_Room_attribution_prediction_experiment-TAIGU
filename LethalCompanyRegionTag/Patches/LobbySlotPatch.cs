@@ -200,38 +200,103 @@ namespace LethalCompanyRegionTag.Patches
             if (string.IsNullOrEmpty(region))
                 return "??";
 
-            // Map common region names to codes
+            // Map region names to short ASCII codes (2-5 chars max)
+            // East Asia
+            if (region.Contains("China (TW")) return "TW";
             if (region.Contains("China")) return "CN";
             if (region.Contains("Japan")) return "JP";
             if (region.Contains("Korea")) return "KR";
+            if (region.Contains("Mongolia")) return "MN";
+
+            // Southeast Asia
+            if (region.Contains("Vietnam")) return "VN";
+            if (region.Contains("Thailand")) return "TH";
+            if (region.Contains("Indonesia")) return "ID";
+            if (region.Contains("Philippines")) return "PH";
+            if (region.Contains("Malaysia")) return "MY";
+            if (region.Contains("Singapore")) return "SG";
+            if (region.Contains("Cambodia")) return "KH";
+            if (region.Contains("Laos")) return "LA";
+            if (region.Contains("Myanmar")) return "MM";
+            if (region.Contains("Southeast Asia")) return "SEA";
+
+            // South Asia
+            if (region.Contains("India")) return "IN";
+            if (region.Contains("Pakistan")) return "PK";
+            if (region.Contains("Bangladesh")) return "BD";
+            if (region.Contains("Sri Lanka")) return "LK";
+            if (region.Contains("Nepal")) return "NP";
+
+            // Middle East / Central Asia
+            if (region.Contains("Turkey")) return "TR";
+            if (region.Contains("Saudi Arabia")) return "SA";
+            if (region.Contains("UAE")) return "AE";
+            if (region.Contains("Iran")) return "IR";
+            if (region.Contains("Israel")) return "IL";
+            if (region.Contains("Middle East")) return "MENA";
+            if (region.Contains("Kazakhstan")) return "KZ";
+            if (region.Contains("Georgia")) return "GE";
+            if (region.Contains("Armenia")) return "AM";
+
+            // Africa
+            if (region.Contains("Egypt")) return "EG";
+            if (region.Contains("Morocco")) return "MA";
+            if (region.Contains("Algeria")) return "DZ";
+            if (region.Contains("South Africa")) return "ZA";
+            if (region.Contains("Ethiopia")) return "ET";
+            if (region.Contains("North Africa")) return "NAF";
+
+            // Russia / CIS
             if (region.Contains("Russia")) return "RU";
             if (region.Contains("Ukraine")) return "UA";
-            if (region.Contains("North America") || region.Contains("USA")) return "US";
-            if (region.Contains("UK") || region.Contains("Britain")) return "GB";
-            if (region.Contains("Germany")) return "DE";
-            if (region.Contains("France")) return "FR";
-            if (region.Contains("Brazil")) return "BR";
-            if (region.Contains("India")) return "IN";
-            if (region.Contains("Thailand")) return "TH";
-            if (region.Contains("Southeast Asia")) return "SEA";
-            if (region.Contains("Middle East")) return "ME";
-            if (region.Contains("Oceania")) return "AU";
-            if (region.Contains("Latin America")) return "LATAM";
-            if (region.Contains("Nordic")) return "NORD";
-            if (region.Contains("Iberia")) return "IB";
-            if (region.Contains("Eastern Europe")) return "EE";
+            if (region.Contains("Belarus")) return "BY";
             if (region.Contains("CIS")) return "CIS";
-            if (region.Contains("Greece")) return "GR";
-            if (region.Contains("Israel")) return "IL";
-            if (region.Contains("Turkey")) return "TR";
+
+            // Eastern Europe
             if (region.Contains("Poland")) return "PL";
+            if (region.Contains("Czech")) return "CZ";
+            if (region.Contains("Slovakia")) return "SK";
+            if (region.Contains("Hungary")) return "HU";
+            if (region.Contains("Romania")) return "RO";
+            if (region.Contains("Bulgaria")) return "BG";
+            if (region.Contains("Croatia")) return "HR";
+            if (region.Contains("Serbia")) return "RS";
+            if (region.Contains("Baltics")) return "BAL";
+            if (region.Contains("Eastern Europe")) return "EE";
+
+            // Western Europe
+            if (region.Contains("Germany")) return "DE";
+            if (region.Contains("Austria")) return "AT";
+            if (region.Contains("France")) return "FR";
             if (region.Contains("Italy")) return "IT";
-            if (region.Contains("Netherlands") || region.Contains("Belgium")) return "BEN";
-            if (region.Contains("Western")) return "WEST";
+            if (region.Contains("Iberia")) return "IB";
+            if (region.Contains("Benelux")) return "BEN";
+            if (region.Contains("UK") || region.Contains("Britain")) return "GB";
+            if (region.Contains("Greece")) return "GR";
+            if (region.Contains("Nordic")) return "NORD";
+            if (region.Contains("Sweden")) return "SE";
+            if (region.Contains("Norway")) return "NO";
+            if (region.Contains("Denmark")) return "DK";
+            if (region.Contains("Finland")) return "FI";
+            if (region.Contains("Switzerland")) return "CH";
+
+            // Americas
+            if (region.Contains("North America") || region.Contains("USA")) return "US";
+            if (region.Contains("Brazil")) return "BR";
+            if (region.Contains("Mexico")) return "MX";
+            if (region.Contains("Argentina")) return "AR";
+            if (region.Contains("Latin America")) return "LAT";
             if (region.Contains("Americas")) return "AM";
 
+            // Oceania
+            if (region.Contains("Oceania")) return "OCE";
+            if (region.Contains("Australia")) return "AU";
+
+            // Western generic
+            if (region.Contains("Western")) return "WEST";
+
             // Fallback: first 2-3 chars uppercase
-            return region.Length >= 2 ? region.Substring(0, 2).ToUpper() : "??";
+            return region.Length >= 2 ? region.Substring(0, Math.Min(region.Length, 3)).ToUpper() : "??";
         }
 
         private static UnityEngine.Color GetTagColor(float confidence)

@@ -354,8 +354,8 @@ namespace LethalCompanyRegionTag.Patches
                 case "western": return "WEST";
                 case "eastern europe": return "EE";
                 case "southeast asia": return "SEA";
-                case "south asia": return "SA";
-                case "central asia": return "CA";
+                case "south asia": return "SAS";
+                case "central asia": return "CAS";
                 case "middle east": return "ME";
                 case "south america": return "LATAM";
                 case "central america": return "LATAM";
@@ -416,9 +416,9 @@ namespace LethalCompanyRegionTag.Patches
                 { "MN", "蒙古" },
                 // Aggregated regions
                 { "WEST", "欧美" }, { "EE", "东欧" }, { "NORD", "北欧" },
-                { "SA", "南亚" }, { "CA", "中亚" }, { "ME", "中东" },
+                { "SAS", "南亚" }, { "CAS", "中亚" }, { "ME", "中东" },
                 { "SEA", "东南亚" }, { "LATAM", "拉美" },
-                { "NA", "北非" }, { "SSA", "南非" }, { "OC", "大洋洲" },
+                { "NA", "北非" }, { "SSA", "撒哈拉以南非洲" }, { "OC", "大洋洲" },
                 { "BLT", "波罗的海" }, { "BALK", "巴尔干" }, { "IB", "伊比利亚" },
                 { "Other", "其他" }, { "??", "未知" },
             };

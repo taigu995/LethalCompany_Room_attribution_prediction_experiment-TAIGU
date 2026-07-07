@@ -2890,6 +2890,7 @@
       "outputPath": "/workspace/projects/LethalCompanyRegionTag/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
+        "/workspace/projects/LethalCompanyRegionTag/NuGet.Config",
         "/root/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
@@ -2897,7 +2898,8 @@
       ],
       "sources": {
         "https://api.nuget.org/v3/index.json": {},
-        "https://nuget.bepinex.dev/v3/index.json": {}
+        "https://nuget.bepinex.dev/v3/index.json": {},
+        "https://nuget.samboy.dev/v3/index.json": {}
       },
       "frameworks": {
         "netstandard2.1": {

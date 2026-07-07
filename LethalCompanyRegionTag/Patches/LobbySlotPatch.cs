@@ -375,10 +375,32 @@ namespace LethalCompanyRegionTag.Patches
         }
 
         /// <summary>
-        /// Region code to Chinese name mapping
+        /// Region code to Chinese name mapping (lazy-initialized to avoid static constructor crashes)
         /// </summary>
-        private static readonly System.Collections.Generic.Dictionary<string, string> RegionCodeToChinese =
-            new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
+        private static System.Collections.Generic.Dictionary<string, string> _regionCodeToChinese;
+        private static System.Collections.Generic.Dictionary<string, string> RegionCodeToChinese
+        {
+            get
+            {
+                if (_regionCodeToChinese == null)
+                {
+                    try
+                    {
+                        _regionCodeToChinese = BuildRegionCodeMap();
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Plugin.LogSource?.LogError($"[TAIGU] Failed to build RegionCodeToChinese: {ex.Message}");
+                        _regionCodeToChinese = new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+                    }
+                }
+                return _regionCodeToChinese;
+            }
+        }
+
+        private static System.Collections.Generic.Dictionary<string, string> BuildRegionCodeMap()
+        {
+            var dict = new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
             {
                 // East Asia
                 { "CN", "中国" }, { "TW", "台湾" }, { "HK", "香港" },
@@ -423,6 +445,8 @@ namespace LethalCompanyRegionTag.Patches
                 { "BLT", "波罗的海" }, { "BALK", "巴尔干" }, { "IB", "伊比利亚" },
                 { "Other", "其他" }, { "??", "未知" },
             };
+            return dict;
+        }
 
         /// <summary>
         /// Get display label for a region code - Chinese or English based on config and font availability

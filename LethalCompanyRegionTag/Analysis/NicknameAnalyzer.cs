@@ -12,7 +12,7 @@ namespace LethalCompanyRegionTag.Analysis
     public static class NicknameAnalyzer
     {
         // Unicode block definitions
-        private static readonly Regex CJKUnified = new Regex(@"[\u4E00-\u9FFF\u3400-\u4DBF\u20000-\u2A6DF]");
+        private static readonly Regex CJKUnified = new Regex(@"[\u4E00-\u9FFF\u3400-\u4DBF]");
         private static readonly Regex Hiragana = new Regex(@"[\u3040-\u309F]");
         private static readonly Regex Katakana = new Regex(@"[\u30A0-\u30FF\u31F0-\u31FF]");
         private static readonly Regex HangulSyllables = new Regex(@"[\uAC00-\uD7AF]");
@@ -44,6 +44,76 @@ namespace LethalCompanyRegionTag.Analysis
                 result.PrimaryRegion = "Unknown";
                 result.Confidence = 0f;
                 result.AnalysisMethod = "Empty";
+                return result;
+            }
+
+            // === Keyword-based detection (highest priority) ===
+            string lowerName = nickname.ToLowerInvariant();
+            
+            // China keywords
+            if (lowerName.Contains("china") || lowerName.Contains(" cn ") || lowerName.Contains("[cn]") ||
+                lowerName.Contains("chinese") || lowerName.Contains("国服") || lowerName.Contains("中国") ||
+                lowerName.Contains("中文") || lowerName.Contains("国人") || lowerName.Contains("no foreigner"))
+            {
+                result.Probabilities["China"] = 92f;
+                result.Probabilities["Other"] = 8f;
+                result.PrimaryRegion = "China";
+                result.Confidence = 92f;
+                result.AnalysisMethod = "Keyword: China";
+                result.CountryCode = "CN";
+                return result;
+            }
+            
+            // Russia/CIS keywords
+            if (lowerName.Contains("russia") || lowerName.Contains(" russian") || lowerName.Contains(" ru ") ||
+                lowerName.Contains("[ru]") || lowerName.Contains("cis") || lowerName.Contains("рус"))
+            {
+                result.Probabilities["Russia"] = 85f;
+                result.Probabilities["Other CIS"] = 10f;
+                result.Probabilities["Other"] = 5f;
+                result.PrimaryRegion = "Russia";
+                result.Confidence = 85f;
+                result.AnalysisMethod = "Keyword: Russia";
+                result.CountryCode = "RU";
+                return result;
+            }
+            
+            // Korea keywords
+            if (lowerName.Contains("korea") || lowerName.Contains(" korean") || lowerName.Contains(" kr ") ||
+                lowerName.Contains("[kr]"))
+            {
+                result.Probabilities["Korea"] = 90f;
+                result.Probabilities["Other"] = 10f;
+                result.PrimaryRegion = "Korea";
+                result.Confidence = 90f;
+                result.AnalysisMethod = "Keyword: Korea";
+                result.CountryCode = "KR";
+                return result;
+            }
+            
+            // Japan keywords
+            if (lowerName.Contains("japan") || lowerName.Contains(" japanese") || lowerName.Contains(" jp ") ||
+                lowerName.Contains("[jp]"))
+            {
+                result.Probabilities["Japan"] = 90f;
+                result.Probabilities["Other"] = 10f;
+                result.PrimaryRegion = "Japan";
+                result.Confidence = 90f;
+                result.AnalysisMethod = "Keyword: Japan";
+                result.CountryCode = "JP";
+                return result;
+            }
+            
+            // Europe/English keywords
+            if (lowerName.Contains("europe") || lowerName.Contains(" eu ") || lowerName.Contains("[eu]") ||
+                lowerName.Contains("english") || lowerName.Contains("german") || lowerName.Contains("french"))
+            {
+                result.Probabilities["Europe"] = 70f;
+                result.Probabilities["North America"] = 15f;
+                result.Probabilities["Other"] = 15f;
+                result.PrimaryRegion = "Europe";
+                result.Confidence = 70f;
+                result.AnalysisMethod = "Keyword: Europe";
                 return result;
             }
 

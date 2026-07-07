@@ -166,11 +166,33 @@ namespace LethalCompanyRegionTag.Patches
             string code = result.CountryCode;
             if (string.IsNullOrEmpty(code))
             {
-                // Use first letters of region name
                 code = GetRegionCode(result.PrimaryRegion);
             }
 
-            return $"[{code}] {result.Confidence:F0}%";
+            // Build full probability distribution string
+            // Format: [CN] 78% | JP 8% | KR 5% | Other 9%
+            var parts = new System.Collections.Generic.List<string>();
+            parts.Add($"[{code}] {result.Confidence:F0}%");
+
+            if (result.Probabilities != null)
+            {
+                // Sort by probability descending, skip the primary region (already shown)
+                var sorted = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, float>>(result.Probabilities);
+                sorted.Sort((a, b) => b.Value.CompareTo(a.Value));
+
+                foreach (var kvp in sorted)
+                {
+                    if (kvp.Value < 3f) continue; // Skip very small probabilities
+                    if (kvp.Key == result.PrimaryRegion) continue; // Already shown as primary
+                    
+                    string regionCode = GetRegionCode(kvp.Key);
+                    parts.Add($"{regionCode} {kvp.Value:F0}%");
+                    
+                    if (parts.Count >= 4) break; // Limit to 4 items max to avoid overflow
+                }
+            }
+
+            return string.Join(" | ", parts);
         }
 
         private static string GetRegionCode(string region)

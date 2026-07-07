@@ -1,6 +1,6 @@
 # TAIGU-Room recognition experiment
 
-> Lethal Company 公开房间地区识别模组 / Public Lobby Region Detection Mod v1.5.0
+> Lethal Company 公开房间地区识别模组 / Public Lobby Region Detection Mod v1.5.1
 > 署名 / Author: TAIGU
 
 ---
@@ -19,18 +19,18 @@ Automatically analyzes the country/region of each lobby creator in Lethal Compan
 
 **中文显示模式 / Chinese Display Mode**（需安装字体 / requires font installation）：
 ```
-[中国 78% | 日本 8% | 韩国 7% | 越南 4%] 来几个人啊起嘛        ← 中国玩家创建 / Chinese player
-[日本 92% | 中国 4% | 欧美 4%]            たのしいゲーム        ← 日本玩家创建 / Japanese player
-[俄罗斯 85% | 乌克兰 8% | 白俄罗斯 4%]    Игровой сервер        ← 俄罗斯玩家创建 / Russian player
-[波兰 65% | 德国 15% | 欧美 12%]          poland polska pl       ← 波兰玩家创建 / Polish player
-[欧美 35% | 德国 20% | 法国 15%]          Cool Lobby             ← 西欧玩家创建 / Western European player
+[中国] 78% | 日本 7% | 韩国 6% | 其他 5%          小肥羊's Crew        ← 中国玩家创建 / Chinese player
+[欧美] 18% | 其他 34% | 美国 18% | 墨西哥 12%     girls only           ← 欧美玩家创建 / Western European player
+[俄罗斯] 55% | 乌克兰 12% | 东欧 10% | 其他 10%   альтушка с 3 рязмером ← 俄罗斯玩家创建 / Russian player
+[挪威] 91% | 其他 9%                              Dine 800hr+ No reset ← 挪威玩家创建 / Norwegian player
+[中国] 78% | 日本 7% | 韩国 6% | 其他 5%          蝙蝠开塞露           ← 中国玩家创建 / Chinese player
 ```
 
 **英文缩写模式 / Abbreviation Mode**（默认，无需字体 / default, no font needed）：
 ```
-[CN 78% | JP 8% | KR 7% | VI 4%] 来几个人啊起嘛
-[JP 92% | CN 4% | WEST 4%]            たのしいゲーム
-[RU 85% | UA 8% | BY 4%]              Игровой сервер
+[CN] 78% | JP 7% | KR 6% | OTHER 5%          小肥羊's Crew
+[WEST] 18% | OTHER 34% | US 18% | MX 12%     girls only
+[RU] 55% | UA 12% | EE 10% | OTHER 10%       альтушка с 3 рязмером
 ```
 
 标签颜色会根据置信度变化 / Tag color changes based on confidence:
@@ -248,6 +248,15 @@ LethalCompanyRegionTag/
 
 ## 版本历史 / Changelog
 
+### v1.5.1 - 地区代码映射修复 / Region Code Mapping Fix
+- 修复 `RegionResult.GetRegionCode` 代码映射不一致导致中文显示失败的问题 / Fixed inconsistent code mapping in `RegionResult.GetRegionCode` causing Chinese display failure
+- 统一三个独立的 `GetRegionCode` 方法返回一致的代码 / Unified three separate `GetRegionCode` methods to return consistent codes
+- 修复 "Western Europe" 显示为 `[EU]` 而非 `[欧美]` 的问题 / Fixed "Western Europe" displaying as `[EU]` instead of `[欧美]`
+- 修复 "Central Asia" 显示为 `[加拿大]` 而非 `[中亚]` 的问题 / Fixed "Central Asia" displaying as `[加拿大]` instead of `[中亚]`
+- 修复 "North America" 显示为 `[美国]` 而非 `[北美]` 的问题 / Fixed "North America" displaying as `[美国]` instead of `[北美]`
+- 修复 "Other CIS"、"Balkans" 等区域代码无中文映射的问题 / Fixed missing Chinese mappings for "Other CIS", "Balkans" and other regions
+- 修复字典大小写重复键导致构建失败的问题 / Fixed case-insensitive duplicate key causing dictionary build failure
+
 ### v1.5.0 - 字体管理器 / Font Manager
 - 新增 FontManager 模块，自动扫描并加载 CJK 字体 / Added FontManager module, auto-scans and loads CJK fonts
 - 支持从插件目录加载 TTF/OTF 字体文件 / Supports loading TTF/OTF font files from plugin directory
@@ -281,7 +290,7 @@ LethalCompanyRegionTag/
 
 | 文件 / File | 大小 / Size | 说明 / Description |
 |------|------|------|
-| `LethalCompanyRegionTag.dll` | 90KB | 主模组 DLL / Main mod DLL |
+| `LethalCompanyRegionTag.dll` | 95KB | 主模组 DLL / Main mod DLL |
 | `chinese_font_ui.ttf` | 19MB | 微软雅黑字体（可选，用于显示中文）/ Microsoft YaHei font (optional, for Chinese display) |
 | `TAIGU-RoomRecognition-README.md` | - | 本说明文件 / This readme file |
 

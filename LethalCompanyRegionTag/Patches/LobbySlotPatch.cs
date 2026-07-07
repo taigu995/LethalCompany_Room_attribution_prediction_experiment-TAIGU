@@ -374,6 +374,18 @@ namespace LethalCompanyRegionTag.Patches
                 case "nordic": return "NORD";
                 case "iberia": return "IB";
                 case "other": return "OTHER";
+                case "other cis": return "EE";
+                case "unknown": return "OTHER";
+                case "nepal": return "SAS";
+                case "cyprus": return "ME";
+                case "eritrea": return "SSA";
+                case "moldova": return "EE";
+                case "portugal": return "IB";
+                case "spain": return "IB";
+                case "slovakia": return "EE";
+                case "netherlands": return "WEST";
+                case "belgium": return "WEST";
+                case "austria": return "WEST";
                 default:
                     // Use first 2-4 chars of region name
                     if (region.Length <= 4) return region.ToUpper();

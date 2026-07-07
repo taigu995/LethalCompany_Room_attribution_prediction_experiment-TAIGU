@@ -364,9 +364,9 @@ namespace LethalCompanyRegionTag.Patches
                 case "middle east": return "ME";
                 case "south america": return "LATAM";
                 case "central america": return "LATAM";
-                case "north america": return "NA";
+                case "north america": return "NAM";
                 case "latin america": return "LATAM";
-                case "north africa": return "NA";
+                case "north africa": return "NAF";
                 case "sub-saharan africa": return "SSA";
                 case "oceania": return "OC";
                 case "baltic": return "BLT";
@@ -435,7 +435,7 @@ namespace LethalCompanyRegionTag.Patches
                 { "KZ", "哈萨克" }, { "UZ", "乌兹别克" },
                 // Middle East
                 { "TR", "土耳其" }, { "SA", "沙特" }, { "AE", "阿联酋" },
-                { "IR", "伊朗" }, { "IQ", "伊拉克" }, { "IL", "以色列" },
+                { "IR", "伊朗" }, { "IQ", "伊拉克" }, { "IL", "以色列" }, { "IE", "爱尔兰" },
                 // Eastern Europe
                 { "RU", "俄罗斯" }, { "PL", "波兰" }, { "UA", "乌克兰" },
                 { "CZ", "捷克" }, { "SK", "斯洛伐克" }, { "HU", "匈牙利" },
@@ -445,7 +445,7 @@ namespace LethalCompanyRegionTag.Patches
                 // Western Europe
                 { "GB", "英国" }, { "FR", "法国" }, { "DE", "德国" },
                 { "IT", "意大利" }, { "ES", "西班牙" }, { "PT", "葡萄牙" },
-                { "NL", "荷兰" }, { "BE", "比利时" }, { "AT", "奥地利" },
+                { "NL", "荷兰" }, { "NO", "挪威" }, { "BE", "比利时" }, { "AT", "奥地利" },
                 // Americas
                 { "US", "美国" }, { "CA", "加拿大" }, { "MX", "墨西哥" },
                 { "BR", "巴西" }, { "AR", "阿根廷" }, { "CL", "智利" },
@@ -457,13 +457,20 @@ namespace LethalCompanyRegionTag.Patches
                 { "AU", "澳洲" }, { "NZ", "新西兰" },
                 // Mongolian
                 { "MN", "蒙古" },
+                // Additional countries (from NicknameAnalyzer)
+                { "AM", "亚美尼亚" }, { "BY", "白俄罗斯" }, { "CH", "瑞士" },
+                { "ER", "厄立特里亚" }, { "GE", "格鲁吉亚" }, { "GR", "希腊" },
+                { "LK", "斯里兰卡" }, { "MD", "摩尔多瓦" }, { "NP", "尼泊尔" },
+                { "RS", "塞尔维亚" },
                 // Aggregated regions
                 { "WEST", "欧美" }, { "EE", "东欧" }, { "NORD", "北欧" },
                 { "SAS", "南亚" }, { "CAS", "中亚" }, { "ME", "中东" },
                 { "SEA", "东南亚" }, { "LATAM", "拉美" },
+                { "NAF", "北非" },
+                { "NAM", "北美" },
                 { "NA", "北非" }, { "SSA", "撒哈拉以南非洲" }, { "OC", "大洋洲" },
                 { "BLT", "波罗的海" }, { "BALK", "巴尔干" }, { "IB", "伊比利亚" },
-                { "Other", "其他" }, { "??", "未知" },
+                { "OTHER", "其他" }, { "Other", "其他" }, { "??", "未知" },
             };
             return dict;
         }

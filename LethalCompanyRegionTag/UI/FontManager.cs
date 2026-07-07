@@ -531,6 +531,7 @@ namespace LethalCompanyRegionTag.UI
                 case "VN": return "越南";
                 case "TH": return "泰国";
                 case "ID": return "印尼";
+                case "IE": return "爱尔兰";
                 case "MY": return "马来";
                 case "PH": return "菲律宾";
                 case "KH": return "柬埔寨";
@@ -573,7 +574,6 @@ namespace LethalCompanyRegionTag.UI
                 case "DK": return "丹麦";
                 case "FI": return "芬兰";
                 case "GB": return "英国";
-                case "IE": return "爱尔兰";
                 case "AU": return "澳大利亚";
                 case "NZ": return "新西兰";
                 case "IN": return "印度";
@@ -589,7 +589,8 @@ namespace LethalCompanyRegionTag.UI
                 case "ME": case "MENA": return "中东";
                 case "SAS": case "SAARC": return "南亚";
                 case "CAS": case "CENTRAL_ASIA": return "中亚";
-                case "NA": return "北非";
+                case "NA": case "NAF": return "北非";
+                case "NAM": return "北美";
                 case "SSA": return "撒哈拉以南非洲";
                 case "OC": case "OCEANIA": return "大洋洲";
                 case "BLT": return "波罗的海";
@@ -597,6 +598,18 @@ namespace LethalCompanyRegionTag.UI
                 case "IB": return "伊比利亚";
                 case "AFRICA": return "非洲";
                 case "OTHER": case "Other": return "其他";
+
+                // Additional countries (from NicknameAnalyzer)
+                case "AM": return "亚美尼亚";
+                case "BY": return "白俄罗斯";
+                case "CH": return "瑞士";
+                case "ER": return "厄立特里亚";
+                case "GE": return "格鲁吉亚";
+                case "GR": return "希腊";
+                case "LK": return "斯里兰卡";
+                case "MD": return "摩尔多瓦";
+                case "NP": return "尼泊尔";
+                case "RS": return "塞尔维亚";
                 case "??": return "未知";
                 default:
                     // 尝试从 LobbySlotPatch 的字典中查找

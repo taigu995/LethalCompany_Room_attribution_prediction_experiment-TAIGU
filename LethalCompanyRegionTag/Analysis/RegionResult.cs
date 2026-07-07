@@ -21,6 +21,20 @@ namespace LethalCompanyRegionTag.Analysis
         /// <summary>ISO 3166-1 alpha-2 country code (if available)</summary>
         public string CountryCode { get; set; }
 
+        /// <summary>Display code for UI tags - preserves original country code for accurate display.
+        /// Falls back to CountryCode, then to region abbreviation.</summary>
+        public string DisplayCode
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(_displayCode)) return _displayCode;
+                if (!string.IsNullOrEmpty(CountryCode)) return CountryCode;
+                return GetRegionCode(PrimaryRegion);
+            }
+            set { _displayCode = value; }
+        }
+        private string _displayCode;
+
         /// <summary>Primary data source used for this result</summary>
         public string Source { get; set; } = "None";
 

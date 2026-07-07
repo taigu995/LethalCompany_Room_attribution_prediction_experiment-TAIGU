@@ -189,6 +189,7 @@ namespace LethalCompanyRegionTag.UI
 
         /// <summary>
         /// Try to load a TTF/OTF font file and create a TMP FontAsset from it.
+        /// Uses multiple strategies to maximize compatibility across Unity versions.
         /// </summary>
         private static bool TryLoadTtfFont(string filePath)
         {
@@ -198,11 +199,71 @@ namespace LethalCompanyRegionTag.UI
 
                 Plugin.LogSource.LogInfo($"[TAIGU] FontManager: Attempting to load TTF font: {filePath}");
 
-                // Load the font using Unity's Font class
-                Font unityFont = new Font(filePath);
+                string fileName = Path.GetFileNameWithoutExtension(filePath);
+                Font unityFont = null;
+
+                // Strategy 1: Direct path loading (works in some Unity versions)
+                try
+                {
+                    unityFont = new Font(filePath);
+                    if (unityFont != null && unityFont.name != null)
+                    {
+                        Plugin.LogSource.LogInfo($"[TAIGU] FontManager: Loaded font via direct path: {unityFont.name}");
+                    }
+                    else
+                    {
+                        unityFont = null;
+                    }
+                }
+                catch { unityFont = null; }
+
+                // Strategy 2: Load by font family name from file name
                 if (unityFont == null)
                 {
-                    Plugin.LogSource.LogWarning($"[TAIGU] FontManager: Failed to create Font from: {filePath}");
+                    try
+                    {
+                        unityFont = Font.CreateDynamicFontFromOSFont(fileName, 16);
+                        if (unityFont != null)
+                        {
+                            Plugin.LogSource.LogInfo($"[TAIGU] FontManager: Loaded font via OS font name: {fileName}");
+                        }
+                    }
+                    catch { unityFont = null; }
+                }
+
+                // Strategy 3: Try known font family names for common CJK fonts
+                if (unityFont == null)
+                {
+                    string[] knownNames = new string[]
+                    {
+                        "Microsoft YaHei", "Microsoft YaHei UI",
+                        "SimHei", "SimSun", "NSimSun", "KaiTi",
+                        "Noto Sans SC", "Noto Sans CJK SC", "Noto Sans",
+                        "Source Han Sans SC", "Source Han Sans CN",
+                        "WenQuanYi Micro Hei", "WenQuanYi Zen Hei",
+                        "PingFang SC", "Hiragino Sans GB",
+                        fileName, fileName.Replace("_", " "), fileName.Replace("-", " ")
+                    };
+
+                    foreach (string fontName in knownNames)
+                    {
+                        if (string.IsNullOrEmpty(fontName)) continue;
+                        try
+                        {
+                            unityFont = Font.CreateDynamicFontFromOSFont(fontName, 16);
+                            if (unityFont != null)
+                            {
+                                Plugin.LogSource.LogInfo($"[TAIGU] FontManager: Loaded font via known name: {fontName}");
+                                break;
+                            }
+                        }
+                        catch { unityFont = null; }
+                    }
+                }
+
+                if (unityFont == null)
+                {
+                    Plugin.LogSource.LogWarning($"[TAIGU] FontManager: Could not load font from: {filePath}");
                     return false;
                 }
 
@@ -216,7 +277,7 @@ namespace LethalCompanyRegionTag.UI
                 }
 
                 // Set the font asset name for identification
-                tmpFont.name = Path.GetFileNameWithoutExtension(filePath);
+                tmpFont.name = fileName;
 
                 _loadedFonts.Add(tmpFont);
                 SetCjkFont(tmpFont);

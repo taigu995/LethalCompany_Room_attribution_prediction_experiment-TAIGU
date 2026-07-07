@@ -145,6 +145,7 @@ namespace LethalCompanyRegionTag.Patches
                         {
                             Source = webResult.Source,
                             CountryCode = webResult.CountryCode,
+                            DisplayCode = webResult.CountryCode,
                             PrimaryRegion = Analysis.RegionAnalyzer.CountryCodeToRegion(webResult.CountryCode),
                             Confidence = webResult.Confidence,
                             Probabilities = BuildWebQueryProbabilityMap(webResult.CountryCode, webResult.Confidence)
@@ -288,8 +289,8 @@ namespace LethalCompanyRegionTag.Patches
             if (result == null || result.PrimaryRegion == "Unknown" || result.Confidence < 10f)
                 return "";
 
-            // Get country code or region abbreviation
-            string code = result.CountryCode;
+            // Get display code - preserves original country code for accurate display
+            string code = result.DisplayCode;
             if (string.IsNullOrEmpty(code))
             {
                 code = GetRegionCode(result.PrimaryRegion);

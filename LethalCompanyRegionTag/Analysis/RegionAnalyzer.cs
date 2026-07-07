@@ -40,6 +40,7 @@ namespace LethalCompanyRegionTag.Analysis
                     {
                         result.Source = "Steam Web API";
                         result.CountryCode = countryCode;
+                        result.DisplayCode = countryCode;
                         result.PrimaryRegion = CountryCodeToRegion(countryCode);
                         result.Confidence = 95f;
                         result.Probabilities = BuildProbabilityMap(result.PrimaryRegion, 95f);
@@ -63,6 +64,7 @@ namespace LethalCompanyRegionTag.Analysis
                     {
                         result.Source = "Steam Community";
                         result.CountryCode = countryCode;
+                        result.DisplayCode = countryCode;
                         result.PrimaryRegion = CountryCodeToRegion(countryCode);
                         result.Confidence = 88f;
                         result.Probabilities = BuildProbabilityMap(result.PrimaryRegion, 88f);
@@ -86,6 +88,7 @@ namespace LethalCompanyRegionTag.Analysis
                     {
                         result.Source = "Steam XML";
                         result.CountryCode = countryCode;
+                        result.DisplayCode = countryCode;
                         result.PrimaryRegion = CountryCodeToRegion(countryCode);
                         result.Confidence = 85f;
                         result.Probabilities = BuildProbabilityMap(result.PrimaryRegion, 85f);
@@ -110,6 +113,7 @@ namespace LethalCompanyRegionTag.Analysis
                     result.Probabilities = nicknameResult.Probabilities;
                     result.Source = "Nickname Analysis";
                     result.CountryCode = nicknameResult.CountryCode ?? RegionToCountryCode(nicknameResult.PrimaryRegion);
+                    result.DisplayCode = nicknameResult.CountryCode;
 
                     Cache.RegionCache.Set(ownerSteamId, result);
                     return result;
@@ -141,6 +145,7 @@ namespace LethalCompanyRegionTag.Analysis
                     result.Probabilities = nicknameResult.Probabilities;
                     result.Source = "Nickname Analysis (Quick)";
                     result.CountryCode = nicknameResult.CountryCode ?? RegionToCountryCode(nicknameResult.PrimaryRegion);
+                    result.DisplayCode = nicknameResult.CountryCode;
                     return result;
                 }
             }

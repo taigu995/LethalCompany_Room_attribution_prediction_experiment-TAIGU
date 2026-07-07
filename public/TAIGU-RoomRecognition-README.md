@@ -1,6 +1,6 @@
 # TAIGU-Room recognition experiment
 
-> Lethal Company 公开房间地区识别模组 v1.1.0
+> Lethal Company 公开房间地区识别模组 v1.5.0
 > 署名: TAIGU
 
 ## 功能概述
@@ -97,6 +97,26 @@
    ```
    <Steam>\steamapps\common\Lethal Company\BepInEx\plugins\LethalCompanyRegionTag.dll
    ```
+3. （可选）安装中文字体以显示中文标签：
+   ```
+   <Steam>\steamapps\common\Lethal Company\BepInEx\plugins\LethalCompanyRegionTag\chinese_font_ui.ttf
+   ```
+   将 `chinese_font_ui.ttf`（微软雅黑字体）放入 `BepInEx/plugins/LethalCompanyRegionTag/` 目录
+
+### 中文字体支持
+
+模组默认使用 ASCII 缩写显示（如 `[CN]`、`[RU]`）。如需显示中文名称（如 `[中国]`、`[俄罗斯]`），需要安装字体：
+
+**方法 1：手动安装字体（推荐）**
+1. 创建目录：`BepInEx/plugins/LethalCompanyRegionTag/`
+2. 将 TTF/OTF 格式的中文字体文件放入该目录
+3. 模组启动时会自动扫描并加载
+
+**方法 2：安装汉化模组**
+- 安装任何包含 CJK 字体的汉化模组，本模组会自动检测并使用其字体
+
+**方法 3：放置字体到游戏根目录**
+- 将字体文件放到游戏根目录，模组也会自动扫描
 3. 启动游戏，模组自动加载
 
 ### 验证安装

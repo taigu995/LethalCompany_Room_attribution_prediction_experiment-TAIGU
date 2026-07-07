@@ -245,9 +245,6 @@ namespace LethalCompanyRegionTag.Patches
                     return;
                 }
 
-                // Apply CJK font support to the text component
-                UI.FontManager.ApplyFontSupport(slot.LobbyName);
-
                 // Append tag to the original text
                 string newText = $"{originalText}  {tag}";
                 

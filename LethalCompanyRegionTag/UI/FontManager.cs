@@ -8,7 +8,7 @@ namespace LethalCompanyRegionTag.UI
 {
     /// <summary>
     /// Manages CJK font loading and fallback for region tag display.
-    /// Scans for existing CJK fonts from localization mods or user-provided fonts.
+    /// Supports loading TTF files directly from the plugin directory.
     /// </summary>
     public static class FontManager
     {
@@ -37,13 +37,20 @@ namespace LethalCompanyRegionTag.UI
             "cjk"
         };
 
-        // File extensions to search
+        // File extensions to search for TMP font assets
         private static readonly string[] FontExtensions = new string[]
         {
             ".assets",
             ".unity3d",
             ".bundle",
             ".fontsettings"
+        };
+
+        // TTF file extensions
+        private static readonly string[] TtfExtensions = new string[]
+        {
+            ".ttf",
+            ".otf"
         };
 
         /// <summary>
@@ -73,8 +80,14 @@ namespace LethalCompanyRegionTag.UI
 
             Plugin.LogSource.LogInfo("[TAIGU] FontManager: Scanning for CJK fonts...");
 
+            // Strategy 0 (Priority): Load TTF from plugin directory
+            TryLoadTtfFromPluginDirectory();
+
             // Strategy 1: Search for already loaded TMP fonts in the project
-            TryFindLoadedCjkFonts();
+            if (!_cjkFontAvailable)
+            {
+                TryFindLoadedCjkFonts();
+            }
 
             // Strategy 2: Search for font asset files in game directory
             if (!_cjkFontAvailable)
@@ -112,7 +125,107 @@ namespace LethalCompanyRegionTag.UI
             else
             {
                 Plugin.LogSource.LogWarning("[TAIGU] FontManager: No CJK font found. Chinese characters will display as ASCII codes.");
-                Plugin.LogSource.LogWarning("[TAIGU] FontManager: Install a Chinese localization mod or place a CJK font file in the game directory.");
+                Plugin.LogSource.LogWarning("[TAIGU] FontManager: Install a Chinese localization mod or place a CJK font file (TTF/OTF) in BepInEx/plugins/LethalCompanyRegionTag/ directory.");
+            }
+        }
+
+        /// <summary>
+        /// Strategy 0: Try to load TTF/OTF font files directly from the plugin directory.
+        /// This is the primary strategy for loading user-provided fonts like Microsoft YaHei.
+        /// </summary>
+        private static void TryLoadTtfFromPluginDirectory()
+        {
+            try
+            {
+                string pluginDir = Path.Combine(
+                    Path.GetDirectoryName(Application.dataPath),
+                    "BepInEx", "plugins", "LethalCompanyRegionTag"
+                );
+
+                if (!Directory.Exists(pluginDir))
+                {
+                    Plugin.LogSource.LogInfo($"[TAIGU] FontManager: Plugin directory not found: {pluginDir}");
+                    return;
+                }
+
+                Plugin.LogSource.LogInfo($"[TAIGU] FontManager: Scanning plugin directory for TTF fonts: {pluginDir}");
+
+                // Search for TTF/OTF files
+                foreach (string ext in TtfExtensions)
+                {
+                    string[] files = Directory.GetFiles(pluginDir, $"*{ext}", SearchOption.TopDirectoryOnly);
+                    foreach (string file in files)
+                    {
+                        if (TryLoadTtfFont(file))
+                        {
+                            Plugin.LogSource.LogInfo($"[TAIGU] FontManager: Successfully loaded TTF font from: {file}");
+                            return;
+                        }
+                    }
+                }
+
+                // Also check for known CJK font names specifically
+                foreach (string fontName in KnownCjkFontFiles)
+                {
+                    foreach (string ext in TtfExtensions)
+                    {
+                        string filePath = Path.Combine(pluginDir, fontName + ext);
+                        if (File.Exists(filePath))
+                        {
+                            if (TryLoadTtfFont(filePath))
+                            {
+                                Plugin.LogSource.LogInfo($"[TAIGU] FontManager: Successfully loaded known CJK font: {filePath}");
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Plugin.LogSource.LogWarning($"[TAIGU] FontManager: Error loading TTF from plugin directory: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Try to load a TTF/OTF font file and create a TMP FontAsset from it.
+        /// </summary>
+        private static bool TryLoadTtfFont(string filePath)
+        {
+            try
+            {
+                if (!File.Exists(filePath)) return false;
+
+                Plugin.LogSource.LogInfo($"[TAIGU] FontManager: Attempting to load TTF font: {filePath}");
+
+                // Load the font using Unity's Font class
+                Font unityFont = new Font(filePath);
+                if (unityFont == null)
+                {
+                    Plugin.LogSource.LogWarning($"[TAIGU] FontManager: Failed to create Font from: {filePath}");
+                    return false;
+                }
+
+                // Create a TMP FontAsset from the Unity Font
+                // Using dynamic SDF mode for runtime font generation
+                TMP_FontAsset tmpFont = TMP_FontAsset.CreateFontAsset(unityFont);
+                if (tmpFont == null)
+                {
+                    Plugin.LogSource.LogWarning($"[TAIGU] FontManager: Failed to create TMP FontAsset from: {filePath}");
+                    return false;
+                }
+
+                // Set the font asset name for identification
+                tmpFont.name = Path.GetFileNameWithoutExtension(filePath);
+
+                _loadedFonts.Add(tmpFont);
+                SetCjkFont(tmpFont);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Plugin.LogSource.LogWarning($"[TAIGU] FontManager: Failed to load TTF font from {filePath}: {ex.Message}");
+                return false;
             }
         }
 
@@ -164,12 +277,15 @@ namespace LethalCompanyRegionTag.UI
                     }
                 }
 
-                // Also search for any .assets files that might contain fonts
-                string[] assetFiles = Directory.GetFiles(directory, "*.assets", SearchOption.TopDirectoryOnly);
-                foreach (string file in assetFiles)
+                // Also search for any TTF files that might contain CJK characters
+                foreach (string ext in TtfExtensions)
                 {
-                    if (TryLoadFontFromFile(file))
-                        return;
+                    string[] files = Directory.GetFiles(directory, $"*{ext}", SearchOption.AllDirectories);
+                    foreach (string file in files)
+                    {
+                        if (TryLoadTtfFont(file))
+                            return;
+                    }
                 }
             }
             catch (Exception ex)
@@ -179,7 +295,7 @@ namespace LethalCompanyRegionTag.UI
         }
 
         /// <summary>
-        /// Try to load a TMP font asset from a file.
+        /// Try to load a TMP font asset from a file (AssetBundle format).
         /// </summary>
         private static bool TryLoadFontFromFile(string filePath)
         {
@@ -299,208 +415,123 @@ namespace LethalCompanyRegionTag.UI
         /// </summary>
         private static void TryAddFallbackToGameFont()
         {
-            if (_cjkFontAsset == null) return;
+            if (!_cjkFontAvailable || _cjkFontAsset == null) return;
 
             try
             {
-                // Try to find the game's default font
+                // Try to find the game's default font (3270-Regular SDF)
                 TMP_FontAsset[] allFonts = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
                 foreach (var font in allFonts)
                 {
                     if (font != null && font.name != null && font.name.Contains("3270"))
                     {
-                        AddFallbackFont(font, _cjkFontAsset);
-                        Plugin.LogSource.LogInfo($"[TAIGU] FontManager: Added CJK fallback to game font '{font.name}'");
-                        return;
-                    }
-                }
-
-                // If we can't find the specific game font, try any font
-                if (allFonts.Length > 0)
-                {
-                    foreach (var font in allFonts)
-                    {
-                        if (font != null && font != _cjkFontAsset)
+                        // Add our CJK font as a fallback
+                        List<TMP_FontAsset> fallbacks = new List<TMP_FontAsset>(font.fallbackFontAssetTable ?? new List<TMP_FontAsset>());
+                        if (!fallbacks.Contains(_cjkFontAsset))
                         {
-                            AddFallbackFont(font, _cjkFontAsset);
-                            Plugin.LogSource.LogInfo($"[TAIGU] FontManager: Added CJK fallback to font '{font.name}'");
-                            return;
+                            fallbacks.Add(_cjkFontAsset);
+                            font.fallbackFontAssetTable = fallbacks;
+                            Plugin.LogSource.LogInfo($"[TAIGU] FontManager: Added CJK font as fallback to game font '{font.name}'");
                         }
+                        return;
                     }
                 }
             }
             catch (Exception ex)
             {
-                Plugin.LogSource.LogWarning($"[TAIGU] FontManager: Error adding fallback: {ex.Message}");
+                Plugin.LogSource.LogWarning($"[TAIGU] FontManager: Error adding fallback font: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// Add a fallback font to a target font if not already present.
-        /// </summary>
-        private static void AddFallbackFont(TMP_FontAsset target, TMP_FontAsset fallback)
-        {
-            if (target == null || fallback == null) return;
-
-            // Check if fallback is already in the list
-            var existingFallbacks = target.fallbackFontAssetTable;
-            if (existingFallbacks == null)
-            {
-                target.fallbackFontAssetTable = new List<TMP_FontAsset>();
-                existingFallbacks = target.fallbackFontAssetTable;
-            }
-
-            if (!existingFallbacks.Contains(fallback))
-            {
-                existingFallbacks.Add(fallback);
-            }
-        }
-
-        /// <summary>
-        /// Apply CJK font support to a specific TMP text component.
-        /// Call this when creating new tag labels.
-        /// </summary>
-        public static void ApplyFontSupport(TextMeshProUGUI textComponent)
-        {
-            if (textComponent == null) return;
-
-            if (_cjkFontAvailable && _cjkFontAsset != null)
-            {
-                // Add CJK font as fallback to this text component's font
-                AddFallbackFont(textComponent.font, _cjkFontAsset);
-            }
-        }
-
-        /// <summary>
-        /// Get the display label for a region code.
-        /// Returns Chinese name if CJK font is available, otherwise returns ASCII code.
+        /// Get the appropriate display label for a region code.
+        /// Returns Chinese name if CJK font is available, otherwise returns the code.
         /// </summary>
         public static string GetDisplayLabel(string regionCode)
         {
-            if (string.IsNullOrEmpty(regionCode)) return "??";
+            if (string.IsNullOrEmpty(regionCode))
+                return regionCode;
 
-            // If CJK font is available, use Chinese names
-            if (_cjkFontAvailable)
+            if (!_cjkFontAvailable)
             {
-                return RegionCodeToChinese(regionCode);
+                // Fallback to ASCII codes if no CJK font
+                return regionCode;
             }
 
-            // Otherwise, return the ASCII code
-            return regionCode;
-        }
-
-        /// <summary>
-        /// Map region code to Chinese name.
-        /// </summary>
-        private static string RegionCodeToChinese(string code)
-        {
-            switch (code.ToUpperInvariant())
+            // Map region codes to Chinese names
+            switch (regionCode.ToUpper())
             {
-                // East Asia
-                case "CN": return "\u4e2d\u56fd";       // 中国
-                case "TW": return "\u53f0\u6e7e";       // 台湾
-                case "HK": return "\u9999\u6e2f";       // 香港
-                case "JP": return "\u65e5\u672c";       // 日本
-                case "KR": return "\u97e9\u56fd";       // 韩国
-
-                // Southeast Asia
-                case "VN": return "\u8d8a\u5357";       // 越南
-                case "TH": return "\u6cf0\u56fd";       // 泰国
-                case "ID": return "\u5370\u5c3c";       // 印尼
-                case "MY": return "\u9a6c\u6765";       // 马来
-                case "PH": return "\u83f2\u5f8b\u5bbe"; // 菲律宾
-                case "SG": return "\u65b0\u52a0\u5761"; // 新加坡
-                case "KH": return "\u67ec\u57d4\u5be8"; // 柬埔寨
-                case "LA": return "\u8001\u631d";       // 老挝
-                case "MM": return "\u7f05\u7538";       // 缅甸
-
-                // South Asia
-                case "IN": return "\u5370\u5ea6";       // 印度
-                case "PK": return "\u5df4\u57fa\u65af\u5766"; // 巴基斯坦
-                case "BD": return "\u5b5f\u52a0\u62c9"; // 孟加拉
-
-                // Central Asia
-                case "KZ": return "\u54c8\u8428\u514b"; // 哈萨克
-                case "UZ": return "\u4e4c\u5179\u522b\u514b"; // 乌兹别克
-                case "MN": return "\u8499\u53e4";       // 蒙古
-
-                // Europe
-                case "RU": return "\u4fc4\u7f57\u65af"; // 俄罗斯
-                case "PL": return "\u6ce2\u5170";       // 波兰
-                case "CZ": return "\u6377\u514b";       // 捷克
-                case "SK": return "\u65af\u6d1b\u4f10\u514b"; // 斯洛伐克
-                case "HU": return "\u5308\u7259\u5229"; // 匈牙利
-                case "RO": return "\u7f57\u9a6c\u5c3c\u4e9a"; // 罗马尼亚
-                case "BG": return "\u4fdd\u52a0\u5229\u4e9a"; // 保加利亚
-                case "UA": return "\u4e4c\u514b\u5170"; // 乌克兰
-                case "BY": return "\u767d\u4fc4\u7f57\u65af"; // 白俄罗斯
-                case "TR": return "\u571f\u8033\u5176"; // 土耳其
-                case "GR": return "\u5e0c\u814a";       // 希腊
-                case "IT": return "\u610f\u5927\u5229"; // 意大利
-                case "ES": return "\u897f\u73ed\u7259"; // 西班牙
-                case "PT": return "\u8461\u8404\u7259"; // 葡萄牙
-                case "FR": return "\u6cd5\u56fd";       // 法国
-                case "DE": return "\u5fb7\u56fd";       // 德国
-                case "NL": return "\u8377\u5170";       // 荷兰
-                case "BE": return "\u6bd4\u5229\u65f6"; // 比利时
-                case "GB": return "\u82f1\u56fd";       // 英国
-                case "UK": return "\u82f1\u56fd";       // 英国
-                case "SE": return "\u745e\u5178";       // 瑞典
-                case "NO": return "\u632a\u5a01";       // 挪威
-                case "DK": return "\u4e39\u9ea6";       // 丹麦
-                case "FI": return "\u82ac\u5170";       // 芬兰
-                case "IE": return "\u7231\u5c14\u5170"; // 爱尔兰
-                case "AT": return "\u5965\u5730\u5229"; // 奥地利
-                case "CH": return "\u745e\u58eb";       // 瑞士
-                case "HR": return "\u514b\u7f57\u5730\u4e9a"; // 克罗地亚
-                case "RS": return "\u585e\u5c14\u7ef4\u4e9a"; // 塞尔维亚
-                case "LT": return "\u7acb\u9676\u5b9b"; // 立陶宛
-                case "LV": return "\u62c9\u8131\u7ef4\u4e9a"; // 拉脱维亚
-                case "EE": return "\u7231\u6c99\u5c3c\u4e9a"; // 爱沙尼亚
-
-                // Americas
-                case "US": return "\u7f8e\u56fd";       // 美国
-                case "CA": return "\u52a0\u62ff\u5927"; // 加拿大
-                case "MX": return "\u58a8\u897f\u54e5"; // 墨西哥
-                case "BR": return "\u5df4\u897f";       // 巴西
-                case "AR": return "\u963f\u6839\u5ef7"; // 阿根廷
-                case "CL": return "\u667a\u5229";       // 智利
-                case "CO": return "\u54e5\u4f26\u6bd4\u4e9a"; // 哥伦比亚
-                case "PE": return "\u79d8\u9c81";       // 秘鲁
-
-                // Middle East
-                case "SA": return "\u6c99\u7279";       // 沙特
-                case "AE": return "\u8fea\u62dc";       // 迪拜
-                case "IR": return "\u4f0a\u6717";       // 伊朗
-                case "IQ": return "\u4f0a\u62c9\u514b"; // 伊拉克
-                case "IL": return "\u4ee5\u8272\u5217"; // 以色列
-                case "EG": return "\u57c3\u53ca";       // 埃及
-
-                // Africa
-                case "ZA": return "\u5357\u975e";       // 南非
-                case "NG": return "\u5c3c\u65e5\u5229\u4e9a"; // 尼日利亚
-                case "KE": return "\u80af\u5c3c\u4e9a"; // 肯尼亚
-                case "MA": return "\u6469\u6d1b\u54e5"; // 摩洛哥
-                case "DZ": return "\u963f\u5c14\u53ca\u5229\u4e9a"; // 阿尔及利亚
-                case "ET": return "\u57c3\u585e\u4fc4\u6bd4\u4e9a"; // 埃塞俄比亚
-
-                // Oceania
-                case "AU": return "\u6fb3\u5927\u5229\u4e9a"; // 澳大利亚
-                case "NZ": return "\u65b0\u897f\u5170"; // 新西兰
-
-                // Aggregated regions
-                case "WEST": return "\u6b27\u7f8e";     // 欧美
-                case "EAST": return "\u4e1c\u6b27";     // 东欧
-                case "NORD": return "\u5317\u6b27";     // 北欧
-                case "SEA": return "\u4e1c\u5357\u4e9a"; // 东南亚
-                case "SASIA": return "\u5357\u4e9a";    // 南亚
-                case "CASIA": return "\u4e2d\u4e9a";    // 中亚
-                case "MENA": return "\u4e2d\u4e1c";     // 中东
-                case "LATAM": return "\u62c9\u7f8e";    // 拉美
-                case "AFR": return "\u975e\u6d32";      // 非洲
-                case "OCE": return "\u5927\u6d0b\u6d32"; // 大洋洲
-
-                default: return code;
+                case "CN": return "中国";
+                case "TW": return "台湾";
+                case "HK": return "香港";
+                case "JP": return "日本";
+                case "KR": return "韩国";
+                case "RU": return "俄罗斯";
+                case "VN": return "越南";
+                case "TH": return "泰国";
+                case "ID": return "印尼";
+                case "MY": return "马来";
+                case "PH": return "菲律宾";
+                case "KH": return "柬埔寨";
+                case "LA": return "老挝";
+                case "MM": return "缅甸";
+                case "MN": return "蒙古";
+                case "PL": return "波兰";
+                case "CZ": return "捷克";
+                case "SK": return "斯洛伐克";
+                case "HU": return "匈牙利";
+                case "RO": return "罗马尼亚";
+                case "BG": return "保加利亚";
+                case "UA": return "乌克兰";
+                case "TR": return "土耳其";
+                case "SA": return "沙特";
+                case "IR": return "伊朗";
+                case "AE": return "阿联酋";
+                case "EG": return "埃及";
+                case "MA": return "摩洛哥";
+                case "DZ": return "阿尔及利亚";
+                case "NG": return "尼日利亚";
+                case "ET": return "埃塞俄比亚";
+                case "ZA": return "南非";
+                case "US": return "美国";
+                case "CA": return "加拿大";
+                case "MX": return "墨西哥";
+                case "BR": return "巴西";
+                case "AR": return "阿根廷";
+                case "CL": return "智利";
+                case "CO": return "哥伦比亚";
+                case "PE": return "秘鲁";
+                case "DE": return "德国";
+                case "FR": return "法国";
+                case "ES": return "西班牙";
+                case "IT": return "意大利";
+                case "PT": return "葡萄牙";
+                case "NL": return "荷兰";
+                case "SE": return "瑞典";
+                case "NO": return "挪威";
+                case "DK": return "丹麦";
+                case "FI": return "芬兰";
+                case "GB": return "英国";
+                case "IE": return "爱尔兰";
+                case "AU": return "澳大利亚";
+                case "NZ": return "新西兰";
+                case "IN": return "印度";
+                case "PK": return "巴基斯坦";
+                case "BD": return "孟加拉";
+                case "KZ": return "哈萨克斯坦";
+                case "UZ": return "乌兹别克斯坦";
+                case "WEST": return "欧美";
+                case "EAST_EU": return "东欧";
+                case "NORDIC": return "北欧";
+                case "SEA": return "东南亚";
+                case "LATAM": return "拉美";
+                case "MENA": return "中东";
+                case "SAARC": return "南亚";
+                case "CENTRAL_ASIA": return "中亚";
+                case "AFRICA": return "非洲";
+                case "OCEANIA": return "大洋洲";
+                case "OTHER": return "其他";
+                default: return regionCode;
             }
         }
     }

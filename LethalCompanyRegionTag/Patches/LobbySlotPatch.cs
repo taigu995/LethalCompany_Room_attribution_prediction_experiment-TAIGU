@@ -295,6 +295,9 @@ namespace LethalCompanyRegionTag.Patches
                 code = GetRegionCode(result.PrimaryRegion);
             }
 
+            // Get display label (Chinese or English based on config)
+            string displayLabel = GetDisplayLabel(code);
+
             // Add source indicator for web query results
             string sourceIndicator = "";
             if (result.Source == "Steam Community" || result.Source == "Steam XML" || result.Source == "Steam Web API")
@@ -303,9 +306,9 @@ namespace LethalCompanyRegionTag.Patches
             }
 
             // Build full probability distribution string
-            // Format: [CN]* 95% | Other 5%  (* = Steam verified)
+            // Format: [中国]* 95% | 其他 5%  (* = Steam verified)
             var parts = new System.Collections.Generic.List<string>();
-            parts.Add($"[{code}]{sourceIndicator} {result.Confidence:F0}%");
+            parts.Add($"[{displayLabel}]{sourceIndicator} {result.Confidence:F0}%");
 
             if (result.Probabilities != null)
             {
@@ -319,7 +322,8 @@ namespace LethalCompanyRegionTag.Patches
                     if (kvp.Key == result.PrimaryRegion) continue; // Already shown as primary
                     
                     string regionCode = GetRegionCode(kvp.Key);
-                    parts.Add($"{regionCode} {kvp.Value:F0}%");
+                    string regionLabel = GetDisplayLabel(regionCode);
+                    parts.Add($"{regionLabel} {kvp.Value:F0}%");
                     
                     if (parts.Count >= 4) break; // Limit to 4 items max to avoid overflow
                 }
@@ -367,6 +371,73 @@ namespace LethalCompanyRegionTag.Patches
                     if (region.Length <= 4) return region.ToUpper();
                     return region.Substring(0, 4).ToUpper();
             }
+        }
+
+        /// <summary>
+        /// Region code to Chinese name mapping
+        /// </summary>
+        private static readonly System.Collections.Generic.Dictionary<string, string> RegionCodeToChinese =
+            new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
+            {
+                // East Asia
+                { "CN", "中国" }, { "TW", "台湾" }, { "HK", "香港" },
+                { "JP", "日本" }, { "KR", "韩国" },
+                // Southeast Asia
+                { "VN", "越南" }, { "TH", "泰国" }, { "ID", "印尼" },
+                { "MY", "马来" }, { "PH", "菲律宾" }, { "SG", "新加坡" },
+                { "KH", "柬埔寨" }, { "LA", "老挝" }, { "MM", "缅甸" },
+                // South Asia
+                { "IN", "印度" }, { "PK", "巴基斯坦" }, { "BD", "孟加拉" },
+                // Central Asia
+                { "KZ", "哈萨克" }, { "UZ", "乌兹别克" },
+                // Middle East
+                { "TR", "土耳其" }, { "SA", "沙特" }, { "AE", "阿联酋" },
+                { "IR", "伊朗" }, { "IQ", "伊拉克" }, { "IL", "以色列" },
+                // Eastern Europe
+                { "RU", "俄罗斯" }, { "PL", "波兰" }, { "UA", "乌克兰" },
+                { "CZ", "捷克" }, { "SK", "斯洛伐克" }, { "HU", "匈牙利" },
+                { "RO", "罗马尼亚" }, { "BG", "保加利亚" },
+                // Nordic
+                { "SE", "瑞典" }, { "FI", "芬兰" }, { "DK", "丹麦" },
+                // Western Europe
+                { "GB", "英国" }, { "FR", "法国" }, { "DE", "德国" },
+                { "IT", "意大利" }, { "ES", "西班牙" }, { "PT", "葡萄牙" },
+                { "NL", "荷兰" }, { "BE", "比利时" }, { "AT", "奥地利" },
+                // Americas
+                { "US", "美国" }, { "CA", "加拿大" }, { "MX", "墨西哥" },
+                { "BR", "巴西" }, { "AR", "阿根廷" }, { "CL", "智利" },
+                { "CO", "哥伦比亚" }, { "PE", "秘鲁" },
+                // Africa
+                { "ZA", "南非" }, { "EG", "埃及" }, { "MA", "摩洛哥" },
+                { "DZ", "阿尔及利亚" }, { "ET", "埃塞俄比亚" }, { "NG", "尼日利亚" },
+                // Oceania
+                { "AU", "澳洲" }, { "NZ", "新西兰" },
+                // Mongolian
+                { "MN", "蒙古" },
+                // Aggregated regions
+                { "WEST", "欧美" }, { "EE", "东欧" }, { "NORD", "北欧" },
+                { "SA", "南亚" }, { "CA", "中亚" }, { "ME", "中东" },
+                { "SEA", "东南亚" }, { "LATAM", "拉美" },
+                { "NA", "北非" }, { "SSA", "南非" }, { "OC", "大洋洲" },
+                { "BLT", "波罗的海" }, { "BALK", "巴尔干" }, { "IB", "伊比利亚" },
+                { "Other", "其他" }, { "??", "未知" },
+            };
+
+        /// <summary>
+        /// Get display label for a region code - Chinese or English based on config
+        /// </summary>
+        private static string GetDisplayLabel(string regionCode)
+        {
+            if (string.IsNullOrEmpty(regionCode))
+                return "??";
+
+            if (Config.PluginConfig.UseChineseDisplay.Value)
+            {
+                if (RegionCodeToChinese.TryGetValue(regionCode, out string chinese))
+                    return chinese;
+            }
+
+            return regionCode;
         }
 
         private static UnityEngine.Color GetTagColor(float confidence)

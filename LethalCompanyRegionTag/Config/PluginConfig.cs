@@ -18,6 +18,7 @@ namespace LethalCompanyRegionTag.Config
         public static ConfigEntry<float> MinConfidenceThreshold { get; private set; }
         public static ConfigEntry<bool> ShowLowConfidenceTags { get; private set; }
         public static ConfigEntry<bool> ShowProbability { get; private set; }
+        public static ConfigEntry<bool> UseChineseDisplay { get; private set; }
 
         public static void Init(ConfigFile configFile)
         {
@@ -53,6 +54,10 @@ namespace LethalCompanyRegionTag.Config
             ShowProbability = configFile.Bind(displaySection,
                 "ShowProbability", true,
                 "Show probability percentage next to the region code (e.g. [CN 78%] instead of just [CN]).");
+
+            UseChineseDisplay = configFile.Bind(displaySection,
+                "UseChineseDisplay", true,
+                "Use Chinese names for region display (e.g. [中国] instead of [CN]). Note: requires game font to support CJK characters. If you see garbled text, set this to false.");
         }
     }
 }

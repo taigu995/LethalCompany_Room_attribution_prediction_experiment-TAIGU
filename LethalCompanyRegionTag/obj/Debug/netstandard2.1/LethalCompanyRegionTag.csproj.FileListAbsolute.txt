@@ -1,0 +1,11 @@
+/workspace/projects/LethalCompanyRegionTag/obj/Debug/netstandard2.1/LethalCompanyRegionTag.csproj.AssemblyReference.cache
+/workspace/projects/LethalCompanyRegionTag/obj/Debug/netstandard2.1/LethalCompanyRegionTag.GeneratedMSBuildEditorConfig.editorconfig
+/workspace/projects/LethalCompanyRegionTag/obj/Debug/netstandard2.1/LethalCompanyRegionTag.AssemblyInfoInputs.cache
+/workspace/projects/LethalCompanyRegionTag/obj/Debug/netstandard2.1/LethalCompanyRegionTag.AssemblyInfo.cs
+/workspace/projects/LethalCompanyRegionTag/obj/Debug/netstandard2.1/LethalCompanyRegionTag.csproj.CoreCompileInputs.cache
+/workspace/projects/LethalCompanyRegionTag/obj/Debug/netstandard2.1/LethalCompanyRegionTag.sourcelink.json
+/workspace/projects/LethalCompanyRegionTag/bin/Debug/netstandard2.1/LethalCompanyRegionTag.deps.json
+/workspace/projects/LethalCompanyRegionTag/bin/Debug/netstandard2.1/LethalCompanyRegionTag.dll
+/workspace/projects/LethalCompanyRegionTag/bin/Debug/netstandard2.1/LethalCompanyRegionTag.pdb
+/workspace/projects/LethalCompanyRegionTag/obj/Debug/netstandard2.1/LethalCompanyRegionTag.dll
+/workspace/projects/LethalCompanyRegionTag/obj/Debug/netstandard2.1/LethalCompanyRegionTag.pdb

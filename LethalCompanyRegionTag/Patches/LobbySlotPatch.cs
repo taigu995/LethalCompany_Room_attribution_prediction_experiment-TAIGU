@@ -364,6 +364,8 @@ namespace LethalCompanyRegionTag.Patches
                 case "middle east": return "ME";
                 case "south america": return "LATAM";
                 case "central america": return "LATAM";
+                case "north america": return "NA";
+                case "latin america": return "LATAM";
                 case "north africa": return "NA";
                 case "sub-saharan africa": return "SSA";
                 case "oceania": return "OC";

@@ -582,16 +582,22 @@ namespace LethalCompanyRegionTag.UI
                 case "KZ": return "哈萨克斯坦";
                 case "UZ": return "乌兹别克斯坦";
                 case "WEST": return "欧美";
-                case "EAST_EU": return "东欧";
-                case "NORDIC": return "北欧";
+                case "EE": case "EAST_EU": return "东欧";
+                case "NORD": case "NORDIC": return "北欧";
                 case "SEA": return "东南亚";
                 case "LATAM": return "拉美";
-                case "MENA": return "中东";
-                case "SAARC": return "南亚";
-                case "CENTRAL_ASIA": return "中亚";
+                case "ME": case "MENA": return "中东";
+                case "SAS": case "SAARC": return "南亚";
+                case "CAS": case "CENTRAL_ASIA": return "中亚";
+                case "NA": return "北非";
+                case "SSA": return "撒哈拉以南非洲";
+                case "OC": case "OCEANIA": return "大洋洲";
+                case "BLT": return "波罗的海";
+                case "BALK": return "巴尔干";
+                case "IB": return "伊比利亚";
                 case "AFRICA": return "非洲";
-                case "OCEANIA": return "大洋洲";
-                case "OTHER": return "其他";
+                case "OTHER": case "Other": return "其他";
+                case "??": return "未知";
                 default: return regionCode;
             }
         }

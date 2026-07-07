@@ -470,7 +470,7 @@ namespace LethalCompanyRegionTag.Patches
                 { "NAM", "北美" },
                 { "NA", "北非" }, { "SSA", "撒哈拉以南非洲" }, { "OC", "大洋洲" },
                 { "BLT", "波罗的海" }, { "BALK", "巴尔干" }, { "IB", "伊比利亚" },
-                { "OTHER", "其他" }, { "Other", "其他" }, { "??", "未知" },
+                { "OTHER", "其他" }, { "??", "未知" },
             };
             return dict;
         }
